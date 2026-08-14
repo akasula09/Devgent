@@ -1,9 +1,12 @@
 
+
+
 # Devgent 🤖
 
 > **An interactive desktop AI developer agent that connects LLMs directly to your local workspace.** Automate document generation, run terminal commands, host local web servers, and maintain project context safely.
 
-![Devgent Preview](demo.mp4)
+
+https://github.com/user-attachments/assets/105ce984-c2ed-41c5-a7c2-604d6643a979
 
 ## ⚡ Quick Reference (TL;DR)
 
