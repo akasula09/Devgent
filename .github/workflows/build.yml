@@ -42,17 +42,19 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build Executable with Nuitka
+        shell: pwsh
         run: |
+          # Limit C++ compiler heap allocation overhead by capping jobs to 2
           python -m nuitka `
             --standalone `
             --onefile `
             --enable-plugin=pyqt6 `
             --windows-console-mode=disable `
-            --jobs=0 `
+            --low-memory `
+            --jobs=2 `
             --assume-yes-for-downloads `
             --output-dir=dist `
             --output-filename=Devgent.exe `
-            --low-memory `
             main.py
 
       - name: Upload Built Executable Artifact
