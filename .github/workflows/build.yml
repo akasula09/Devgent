@@ -48,6 +48,7 @@ jobs:
             --onefile `
             --enable-plugin=pyqt6 `
             --windows-console-mode=disable `
+            --jobs=0 `
             --assume-yes-for-downloads `
             --output-dir=dist `
             --output-filename=Devgent.exe `
