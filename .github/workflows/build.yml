@@ -52,6 +52,7 @@ jobs:
             --assume-yes-for-downloads `
             --output-dir=dist `
             --output-filename=Devgent.exe `
+            --low-memory `
             main.py
 
       - name: Upload Built Executable Artifact
