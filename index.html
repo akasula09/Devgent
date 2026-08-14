@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devgent - AI-Powered Developer Automation Tool</title>
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 0;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--text-main);
+    }
+
+    .logo span {
+      color: var(--accent);
+    }
+
+    .nav-btn {
+      background-color: var(--accent);
+      color: white;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 4rem 1rem 3rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    /* Video Player */
+    .video-container {
+      max-width: 1000px;
+      margin: 0 auto 5rem;
+      padding: 0 1rem;
+    }
+
+    .video-wrapper {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 1px solid var(--card-border);
+      background-color: var(--card-bg);
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Features Section */
+    .features-section {
+      max-width: 1100px;
+      margin: 0 auto 5rem;
+      padding: 0 1rem;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Download Section */
+    .download-section {
+      text-align: center;
+      background-color: var(--card-bg);
+      border-top: 1px solid var(--card-border);
+      border-bottom: 1px solid var(--card-border);
+      padding: 4rem 1rem;
+      margin-bottom: 3rem;
+    }
+
+    .download-btn {
+      display: inline-block;
+      background-color: var(--accent);
+      color: white;
+      padding: 1rem 2.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: background 0.2s ease;
+      margin-top: 1.5rem;
+    }
+
+    .download-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">Dev<span>gent</span></div>
+    <a href="#download" class="nav-btn">Get Devgent</a>
+  </header>
+
+  <section class="hero">
+    <h1>Automate Your Desktop Workflow with AI</h1>
+    <p>Devgent is a local developer desktop utility that executes file creation, runs terminal commands, and manages dynamic memory context seamlessly.</p>
+  </section>
+
+  <!-- Autoplay / Looping Demo Video -->
+  <div class="video-container">
+    <div class="video-wrapper">
+      <video autoplay loop muted playsinline>
+        <source src="demo.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+
+  <!-- Key Features -->
+  <section class="features-section">
+    <h2 class="section-title">Key Capabilities</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <h3>Automated File Generation</h3>
+        <p>Generate, scaffold, and edit project source files locally with precision through dynamic AI tool execution.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Integrated Terminal Execution</h3>
+        <p>Safely run CLI commands and build scripts directly within your workspace environment.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Dynamic Memory Management</h3>
+        <p>Keep track of essential context, developer preferences, and build options across sessions without bloating prompts.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Native Desktop Interface</h3>
+        <p>Built with PyQt6 for a lightweight, responsive local GUI tailored for fast desktop workflows.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Standalone Executable</h3>
+        <p>Runs as a single, compiled local binary—no runtime dependencies or Python setup required for end users.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Multi-Document Parsing</h3>
+        <p>Built-in support for reading and parsing markdown, docs, spreadsheets, presentation decks, and PDFs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download Call to Action -->
+  <section id="download" class="download-section">
+    <h2>Ready to speed up your workflow?</h2>
+    <p>Download the latest release for Windows.</p>
+    <a href="Devgent.exe" class="download-btn" download>Download Devgent.exe</a>
+  </section>
+
+  <footer>
+    <p>&copy; Devgent. Built for developers.</p>
+  </footer>
+
+</body>
+</html>
