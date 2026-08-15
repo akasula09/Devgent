@@ -51,10 +51,6 @@ jobs:
           pip install nuitka ordered-set zstandard
           pip install PyQt6 requests markdown2 python-docx openpyxl pypdf reportlab python-pptx google-genai
 
-      # Enable Compiler Cache for faster subsequent builds
-      - name: Setup CCache for Nuitka
-        uses: Nuitka-actions/with-ccache@v2
-
       # Build with Nuitka
       - name: Build with Nuitka
         run: |
