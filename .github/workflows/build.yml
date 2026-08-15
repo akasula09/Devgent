@@ -34,7 +34,7 @@ jobs:
             --lto=no `
             --low-memory `
             --msvc=latest `
-            --nofollow-import-by-name=google.genai.types `
+            --nofollow-import-to=google.genai.types `
             --include-package=google.genai `
             --include-package=docx `
             --include-package=openpyxl `
