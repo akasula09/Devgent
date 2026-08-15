@@ -1,64 +1,52 @@
-name: Build Devgent Executable
+name: Build Devgent Windows App
 
-# Runs on every push to main, and can also be triggered manually from the
-# Actions tab (Run workflow button).
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: {}
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            artifact_name: Devgent-windows
-          - os: ubuntu-latest
-            artifact_name: Devgent-linux
-          - os: macos-latest
-            artifact_name: Devgent-macos
-
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    runs-on: windows-latest
 
     steps:
-      - name: Check out repo
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
-      # Install C Compilers & System Libraries
-      - name: Install C Compiler & Qt6 Dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc g++ libgl1-mesa-dev libegl1-mesa libxkbcommon-x11-0
-
-      - name: Set up MSVC Compiler (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Install Python Dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka ordered-set zstandard
-          pip install PyQt6 requests markdown2 python-docx openpyxl pypdf reportlab python-pptx google-genai
+          pip install nuitka zstandard
+          if (Test-Path "requirements.txt") { pip install -r requirements.txt }
 
-      # Build with Nuitka
-      - name: Build with Nuitka
+      - name: Build Executable with Nuitka
         run: |
-          python -m nuitka --standalone --onefile --enable-plugin=pyqt6 --windows-console-mode=disable --assume-yes-for-downloads --jobs=1 --low-memory --lto=no --output-dir=build AIAgent.py
+          python -m nuitka `
+            --standalone `
+            --onefile `
+            --lto=no `
+            --low-memory `
+            --msvc=latest `
+            --nofollow-import-by-name=google.genai.types `
+            --include-package=google.genai `
+            --enable-plugin=pyqt6 `
+            --windows-console-mode=disable `
+            --assume-yes-for-downloads `
+            --jobs=1 `
+            --output-dir=build `
+            AIAgent.py
 
-      - name: Upload build artifact
+      - name: Upload Windows Executable Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            build/*.exe
-            build/AIAgent.bin
-            build/AIAgent
-          if-no-files-found: ignore
+          name: Devgent-Windows-Executable
+          path: build/*.exe
+          retention-days: 7
