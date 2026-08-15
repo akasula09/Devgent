@@ -1,0 +1,9 @@
+PyQt6
+requests
+markdown2
+google-genai
+python-docx
+openpyxl
+pypdf
+reportlab
+python-pptx
