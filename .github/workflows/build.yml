@@ -19,13 +19,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
-      - name: Install Dependencies
+      - name: Install Dependencies from requirements.txt
         run: |
           python -m pip install --upgrade pip
           pip install nuitka zstandard
-          if (Test-Path "requirements.txt") { pip install -r requirements.txt }
+          pip install -r requirements.txt
 
       - name: Build Executable with Nuitka
         run: |
@@ -37,6 +36,12 @@ jobs:
             --msvc=latest `
             --nofollow-import-by-name=google.genai.types `
             --include-package=google.genai `
+            --include-package=docx `
+            --include-package=openpyxl `
+            --include-package=pypdf `
+            --include-package=reportlab `
+            --include-package=pptx `
+            --include-package=markdown2 `
             --enable-plugin=pyqt6 `
             --windows-console-mode=disable `
             --assume-yes-for-downloads `
