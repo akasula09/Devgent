@@ -1,246 +1,668 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Devgent - AI-Powered Developer Automation Tool</title>
-  <style>
-    :root {
-      --bg-dark: #0b0f19;
-      --card-bg: #111827;
-      --card-border: #1f2937;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --text-main: #f9fafb;
-      --text-muted: #9ca3af;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devgent — The free AI agent that finishes the job</title>
+<meta name="description" content="Devgent is a free, open-source desktop AI agent that builds real Word docs, PowerPoint decks, spreadsheets, PDFs, and code — then asks permission before it acts. Bring your own free Gemini key.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#060912;
+    --panel:#0D1420;
+    --panel-2:#111A2B;
+    --border:#1D2A3F;
+    --border-soft:#16202F;
+    --text:#F1F5F9;
+    --muted:#8B9AB3;
+    --muted-dim:#5C6B84;
+    --blue:#3B82F6;
+    --blue-bright:#5B9BFF;
+    --cyan:#38BDF8;
+    --green:#10B981;
+    --radius:14px;
+    --max:1160px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(59,130,246,0.16), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(56,189,248,0.10), transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+  h1,h2,h3,.font-display{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+  img,video{max-width:100%;display:block;}
+  .wrap{max-width:var(--max);margin:0 auto;padding:0 24px;position:relative;z-index:1;}
+  section{position:relative;z-index:1;}
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+  /* ---------- NAV ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(6,9,18,0.78);
+    backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border-soft);
+  }
+  nav.wrap{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:19px;letter-spacing:-0.02em;}
+  .brand-mark{
+    width:26px;height:26px;border-radius:7px;
+    background:linear-gradient(135deg,var(--blue),var(--cyan));
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#04101f;
+    flex-shrink:0;
+  }
+  .nav-links{display:flex;gap:30px;align-items:center;}
+  .nav-links a{font-size:14.5px;color:var(--muted);text-decoration:none;transition:color .15s;}
+  .nav-links a:hover{color:var(--text);}
+  .nav-cta{display:flex;align-items:center;gap:18px;}
+  .nav-cta .ghost-link{font-size:14px;color:var(--muted);text-decoration:none;display:none;}
+  #navToggle{display:none;}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      line-height: 1.6;
-      padding: 0;
-    }
+  /* ---------- BUTTONS ---------- */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:12px 20px;border-radius:9px;font-weight:600;font-size:14.5px;
+    text-decoration:none;border:1px solid transparent;cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+    white-space:nowrap;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{
+    background:linear-gradient(135deg,var(--blue),#2563EB);
+    color:#fff;
+    box-shadow:0 0 0 1px rgba(59,130,246,0.35), 0 10px 30px -8px rgba(59,130,246,0.55);
+  }
+  .btn-primary:hover{box-shadow:0 0 0 1px rgba(91,155,255,0.55), 0 14px 34px -6px rgba(59,130,246,0.7);transform:translateY(-1px);}
+  .btn-outline{
+    background:rgba(255,255,255,0.02);
+    color:var(--text);
+    border-color:var(--border);
+  }
+  .btn-outline:hover{border-color:var(--blue-bright);background:rgba(59,130,246,0.08);}
+  .btn-sm{padding:9px 15px;font-size:13.5px;}
+  .btn-block{width:100%;}
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1.5rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
+  /* ---------- HERO ---------- */
+  .hero{padding:76px 0 40px;}
+  .hero-grid{display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.06em;
+    color:var(--cyan);background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);
+    padding:6px 12px;border-radius:999px;margin-bottom:22px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,0.2);}
+  .hero h1{
+    font-size:clamp(34px,4.6vw,54px);
+    line-height:1.06;
+    letter-spacing:-0.03em;
+    margin:0 0 22px;
+    font-weight:700;
+  }
+  .hero h1 .accent{
+    background:linear-gradient(100deg,var(--blue-bright),var(--cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p.lead{font-size:17.5px;color:var(--muted);max-width:520px;margin:0 0 32px;}
+  .hero-ctas{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .hero-fineprint{font-size:13px;color:var(--muted-dim);margin:0 0 30px;}
+  .hero-fineprint strong{color:var(--muted);}
+  .trust-row{display:flex;flex-wrap:wrap;gap:10px;}
+  .trust-chip{
+    display:flex;align-items:center;gap:7px;
+    font-size:12.5px;color:var(--muted);
+    background:var(--panel);border:1px solid var(--border-soft);
+    padding:8px 12px;border-radius:8px;
+  }
 
-    .logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      letter-spacing: -0.025em;
-      color: var(--text-main);
-    }
+  /* ---------- MOCKUP (signature element) ---------- */
+  .mockup{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:0 30px 70px -25px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  }
+  .mockup-titlebar{
+    display:flex;align-items:center;gap:8px;
+    padding:12px 14px;border-bottom:1px solid var(--border-soft);
+    background:var(--panel-2);
+  }
+  .mockup-dot{width:10px;height:10px;border-radius:50%;}
+  .mockup-titlebar span.mono{margin-left:6px;font-size:11.5px;color:var(--muted-dim);}
+  .mockup-body{padding:20px 20px 22px;min-height:320px;display:flex;flex-direction:column;gap:14px;}
+  .bubble{max-width:88%;padding:11px 14px;border-radius:11px;font-size:13.5px;opacity:0;transform:translateY(6px);animation:riseIn .5s ease forwards;}
+  .bubble-user{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:3px;}
+  .bubble-agent{align-self:flex-start;background:var(--panel-2);border:1px solid var(--border-soft);border-bottom-left-radius:3px;color:var(--text);}
+  .bubble-agent .label{display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--cyan);margin-bottom:4px;letter-spacing:.04em;}
+  @keyframes riseIn{to{opacity:1;transform:translateY(0);}}
+  .typing-dots{display:inline-flex;gap:3px;align-items:center;}
+  .typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite ease-in-out;}
+  .typing-dots span:nth-child(2){animation-delay:.2s;}
+  .typing-dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
+  .action-card{
+    align-self:flex-start;display:flex;align-items:center;gap:10px;
+    background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.3);
+    padding:10px 13px;border-radius:10px;font-size:13px;
+    opacity:0;transform:translateY(6px);animation:riseIn .5s ease forwards;
+  }
+  .action-card .check{
+    width:18px;height:18px;border-radius:50%;background:var(--green);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    font-size:11px;color:#04120c;font-weight:700;
+  }
+  .action-card .filename{font-family:'JetBrains Mono',monospace;color:#6EE7B7;}
+  .perm-card{
+    align-self:flex-start;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:10px;padding:10px 13px;font-size:12.5px;color:var(--muted);
+    opacity:0;transform:translateY(6px);animation:riseIn .5s ease forwards;
+  }
+  .perm-card .row{display:flex;gap:8px;margin-top:8px;}
+  .perm-btn{font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);}
+  .perm-yes{background:var(--blue);color:#fff;border-color:var(--blue);}
 
-    .logo span {
-      color: var(--accent);
-    }
+  /* ---------- MARQUEE ---------- */
+  .marquee-section{padding:34px 0;border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);background:var(--panel);}
+  .marquee-label{text-align:center;font-size:12.5px;color:var(--muted-dim);font-family:'JetBrains Mono',monospace;letter-spacing:.05em;margin-bottom:18px;}
+  .marquee-track-wrap{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);}
+  .marquee-track{display:flex;gap:14px;width:max-content;animation:scroll 26s linear infinite;}
+  .marquee-track:hover{animation-play-state:paused;}
+  @keyframes scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  .file-chip{
+    font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);
+    background:var(--panel-2);border:1px solid var(--border);
+    padding:9px 16px;border-radius:8px;white-space:nowrap;
+  }
+  .file-chip b{color:var(--cyan);}
 
-    .nav-btn {
-      background-color: var(--accent);
-      color: white;
-      padding: 0.6rem 1.2rem;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: background 0.2s ease;
-    }
+  /* ---------- SECTION HEADERS ---------- */
+  .section-pad{padding:88px 0;}
+  .section-head{max-width:640px;margin:0 auto 48px;text-align:center;}
+  .section-eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.08em;color:var(--blue-bright);text-transform:uppercase;margin-bottom:12px;}
+  .section-head h2{font-size:clamp(26px,3.4vw,38px);letter-spacing:-0.02em;margin:0 0 14px;}
+  .section-head p{color:var(--muted);font-size:16px;margin:0;}
 
-    .nav-btn:hover {
-      background-color: var(--accent-hover);
-    }
+  /* ---------- VIDEO ---------- */
+  .video-frame{
+    max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;
+    border:1px solid var(--border);background:var(--panel);
+    box-shadow:0 40px 90px -30px rgba(0,0,0,0.7);
+  }
+  .video-frame video{width:100%;display:block;background:#000;}
+  .video-caption{text-align:center;color:var(--muted-dim);font-size:13px;margin-top:16px;font-family:'JetBrains Mono',monospace;}
 
-    /* Hero Section */
-    .hero {
-      text-align: center;
-      padding: 4rem 1rem 3rem;
-      max-width: 900px;
-      margin: 0 auto;
-    }
+  /* ---------- FEATURE GRID ---------- */
+  .feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .feature-card{
+    background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+    padding:26px 24px;transition:border-color .2s, transform .2s;
+  }
+  .feature-card:hover{border-color:rgba(59,130,246,0.4);transform:translateY(-2px);}
+  .feature-icon{
+    width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.25);margin-bottom:16px;font-size:18px;
+  }
+  .feature-card h3{font-size:16.5px;margin:0 0 8px;letter-spacing:-0.01em;}
+  .feature-card p{font-size:14px;color:var(--muted);margin:0;}
 
-    .hero h1 {
-      font-size: 3rem;
-      font-weight: 800;
-      line-height: 1.2;
-      margin-bottom: 1rem;
-    }
+  /* ---------- STEPS ---------- */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;}
+  .step{padding:0 18px;position:relative;}
+  .step:not(:last-child)::after{
+    content:"";position:absolute;top:19px;right:-9px;width:18px;height:1px;
+    background:linear-gradient(90deg,var(--border),transparent);
+  }
+  .step-num{
+    font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--bg);
+    width:38px;height:38px;border-radius:50%;
+    background:linear-gradient(135deg,var(--blue),var(--cyan));
+    display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:16px;
+  }
+  .step h3{font-size:15.5px;margin:0 0 8px;}
+  .step p{font-size:13.5px;color:var(--muted);margin:0;}
 
-    .hero p {
-      font-size: 1.25rem;
-      color: var(--text-muted);
-      margin-bottom: 2rem;
-    }
+  /* ---------- OPEN SOURCE / BYOK ---------- */
+  .split-panel{
+    display:grid;grid-template-columns:1fr 1fr;gap:20px;
+  }
+  .info-card{
+    background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+    padding:30px 28px;
+  }
+  .info-card h3{font-size:18px;margin:0 0 12px;display:flex;align-items:center;gap:10px;}
+  .info-card p{color:var(--muted);font-size:14.5px;margin:0 0 14px;}
+  .info-card ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px;}
+  .info-card li{margin-bottom:6px;}
+  .info-card code{font-family:'JetBrains Mono',monospace;background:var(--panel-2);padding:1px 6px;border-radius:4px;font-size:13px;color:var(--cyan);}
 
-    /* Video Player */
-    .video-container {
-      max-width: 1000px;
-      margin: 0 auto 5rem;
-      padding: 0 1rem;
-    }
+  /* ---------- FAQ ---------- */
+  .faq-list{max-width:760px;margin:0 auto;}
+  .faq-item{border-bottom:1px solid var(--border-soft);}
+  .faq-q{
+    width:100%;text-align:left;background:none;border:none;color:var(--text);
+    font-family:'Inter',sans-serif;font-size:15.5px;font-weight:600;
+    padding:20px 4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;
+  }
+  .faq-q .plus{font-family:'JetBrains Mono',monospace;color:var(--muted);transition:transform .2s;flex-shrink:0;}
+  .faq-item.open .faq-q .plus{transform:rotate(45deg);color:var(--cyan);}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+  .faq-a p{color:var(--muted);font-size:14.5px;padding:0 4px 20px;margin:0;}
 
-    .video-wrapper {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      border: 1px solid var(--card-border);
-      background-color: var(--card-bg);
-    }
+  /* ---------- FINAL CTA ---------- */
+  .final-cta{
+    text-align:center;padding:90px 0 100px;
+    background:radial-gradient(ellipse 700px 300px at 50% 0%, rgba(59,130,246,0.14), transparent 70%);
+  }
+  .final-cta h2{font-size:clamp(28px,4vw,42px);margin:0 0 16px;letter-spacing:-0.02em;}
+  .final-cta p{color:var(--muted);font-size:16px;margin:0 0 32px;}
+  .final-cta .hero-ctas{justify-content:center;}
+  .final-cta .hero-fineprint{max-width:400px;margin:18px auto 0;text-align:center;}
 
-    video {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
+  /* ---------- FOOTER ---------- */
+  footer{border-top:1px solid var(--border-soft);padding:40px 0;}
+  .footer-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+  .footer-links{display:flex;gap:22px;}
+  .footer-links a{font-size:13.5px;color:var(--muted);text-decoration:none;}
+  .footer-links a:hover{color:var(--text);}
+  .footer-note{font-size:12.5px;color:var(--muted-dim);}
 
-    /* Features Section */
-    .features-section {
-      max-width: 1100px;
-      margin: 0 auto 5rem;
-      padding: 0 1rem;
-    }
+  /* ---------- REVEAL ---------- */
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in{opacity:1;transform:translateY(0);}
 
-    .section-title {
-      text-align: center;
-      font-size: 2rem;
-      margin-bottom: 3rem;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .feature-card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 1.75rem;
-    }
-
-    .feature-card h3 {
-      font-size: 1.25rem;
-      margin-bottom: 0.5rem;
-      color: var(--text-main);
-    }
-
-    .feature-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-    }
-
-    /* Download Section */
-    .download-section {
-      text-align: center;
-      background-color: var(--card-bg);
-      border-top: 1px solid var(--card-border);
-      border-bottom: 1px solid var(--card-border);
-      padding: 4rem 1rem;
-      margin-bottom: 3rem;
-    }
-
-    .download-btn {
-      display: inline-block;
-      background-color: var(--accent);
-      color: white;
-      padding: 1rem 2.5rem;
-      font-size: 1.1rem;
-      font-weight: 700;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: background 0.2s ease;
-      margin-top: 1.5rem;
-    }
-
-    .download-btn:hover {
-      background-color: var(--accent-hover);
-    }
-
-    footer {
-      text-align: center;
-      padding: 2rem 1rem;
-      color: var(--text-muted);
-      font-size: 0.875rem;
-    }
-  </style>
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:900px){
+    .hero-grid{grid-template-columns:1fr;gap:40px;}
+    .feature-grid{grid-template-columns:1fr 1fr;}
+    .steps{grid-template-columns:1fr 1fr;row-gap:28px;}
+    .step:not(:last-child)::after{display:none;}
+    .split-panel{grid-template-columns:1fr;}
+    .nav-links{display:none;}
+  }
+  @media (max-width:560px){
+    .feature-grid{grid-template-columns:1fr;}
+    .steps{grid-template-columns:1fr;}
+    .hero{padding:48px 0 30px;}
+    .hero-ctas .btn{flex:1 1 auto;}
+    .section-pad{padding:64px 0;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;}
+    html{scroll-behavior:auto;}
+  }
+</style>
 </head>
 <body>
 
-  <header>
-    <div class="logo">Dev<span>gent</span></div>
-    <a href="#download" class="nav-btn">Get Devgent</a>
-  </header>
+<header>
+  <nav class="wrap">
+    <div class="brand">
+      <span class="brand-mark">D</span>
+      Devgent
+    </div>
+    <div class="nav-links">
+      <a href="#capabilities">Capabilities</a>
+      <a href="#demo">Demo</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-cta">
+      <a class="ghost-link" href="https://github.com/YOUR-USERNAME/devgent" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="btn btn-primary btn-sm" href="#download">Download free</a>
+    </div>
+  </nav>
+</header>
 
+<main>
+  <!-- ================= HERO ================= -->
   <section class="hero">
-    <h1>Automate Your Desktop Workflow with AI</h1>
-    <p>Devgent is a local developer desktop utility that executes file creation, runs terminal commands, and manages dynamic memory context seamlessly.</p>
+    <div class="wrap hero-grid">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>FREE FOREVER · OPEN SOURCE · MIT LICENSE</div>
+        <h1>Your computer,<br>finally doing <span class="accent">the typing.</span></h1>
+        <p class="lead">Devgent is a desktop AI agent that doesn't just talk about the work — it makes the Word doc, builds the slide deck, fills the spreadsheet, writes and runs the code. You approve every step. It ships the file.</p>
+        <div class="hero-ctas" id="download">
+          <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-windows.zip" class="btn btn-primary" data-os="Windows">⊞ Download for Windows</a>
+          <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-macos.zip" class="btn btn-outline" data-os="macOS"> Download for macOS</a>
+          <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-linux.zip" class="btn btn-outline" data-os="Linux">⌘ Download for Linux</a>
+        </div>
+        <p class="hero-fineprint"><strong>No account. No credit card. No trial.</strong> Just plug in a free Gemini API key and start building — takes about 2 minutes.</p>
+        <div class="trust-row">
+          <div class="trust-chip">🔓 Fully open source</div>
+          <div class="trust-chip">🔑 Bring your own free API key</div>
+          <div class="trust-chip">🧠 Remembers your projects</div>
+          <div class="trust-chip">✅ Asks before it acts</div>
+        </div>
+      </div>
+
+      <div class="mockup reveal in" id="mockup">
+        <div class="mockup-titlebar">
+          <div class="mockup-dot" style="background:#FF5F56;"></div>
+          <div class="mockup-dot" style="background:#FFBD2E;"></div>
+          <div class="mockup-dot" style="background:#27C93F;"></div>
+          <span class="mono">devgent — desktop agent workspace</span>
+        </div>
+        <div class="mockup-body" id="mockupBody"></div>
+      </div>
+    </div>
   </section>
 
-  <!-- Autoplay / Looping Demo Video -->
-  <div class="video-container">
-    <div class="video-wrapper">
-      <video autoplay loop muted playsinline>
-        <source src="demo.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-      </video>
+  <!-- ================= MARQUEE ================= -->
+  <section class="marquee-section">
+    <div class="marquee-label">GENERATES REAL FILES YOU CAN OPEN IMMEDIATELY — NO EXPORT STEP, NO WATERMARK</div>
+    <div class="marquee-track-wrap">
+      <div class="marquee-track" id="marqueeTrack"></div>
+    </div>
+  </section>
+
+  <!-- ================= VIDEO DEMO ================= -->
+  <section class="section-pad" id="demo">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="section-eyebrow">See it, don't just read about it</div>
+        <h2>Watch Devgent build a full PowerPoint</h2>
+        <p>One prompt in, one finished .pptx out — styled, chart included, ready to present. This is real output, not a mockup.</p>
+      </div>
+      <div class="video-frame reveal">
+        <video controls preload="metadata" poster="">
+          <source src="demo.mp4" type="video/mp4">
+          Your browser doesn't support embedded video — <a href="demo.mp4">download the demo</a> instead.
+        </video>
+      </div>
+      <p class="video-caption">demo.mp4 — unedited, single prompt to finished deck</p>
+    </div>
+  </section>
+
+  <!-- ================= CAPABILITIES ================= -->
+  <section class="section-pad" id="capabilities" style="background:var(--panel);border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="section-eyebrow">What it actually does</div>
+        <h2>One agent, the whole desk</h2>
+        <p>Devgent doesn't specialize in one file type — it covers the work that usually means switching between five different apps.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon">📄</div>
+          <h3>Documents &amp; decks</h3>
+          <p>Word documents, styled PowerPoint presentations with real charts, Excel spreadsheets, and formatted PDF reports — built from your content, not a generic template.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">⌨️</div>
+          <h3>Writes and runs code</h3>
+          <p>Generates code in any language, then can execute terminal commands or spin up a live local dev server — always with a permission prompt before anything runs.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">🧠</div>
+          <h3>Persistent memory</h3>
+          <p>Devgent remembers your project details, preferences, and decisions across sessions, so you're not re-explaining context every time you open it.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">📚</div>
+          <h3>Large context window</h3>
+          <p>Hand it whole files, specs, or reference documents — it keeps track of everything in the conversation, not just your last message.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">🛡️</div>
+          <h3>You approve every action</h3>
+          <p>Every file write and every terminal command shows a yes/no confirmation before it happens. Nothing touches your machine without a green light from you.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon">⚙️</div>
+          <h3>Cloud or fully local</h3>
+          <p>Use a free Google Gemini API key for the fastest experience, or point Devgent at a local Ollama model and run everything offline.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= HOW IT WORKS ================= -->
+  <section class="section-pad" id="how">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="section-eyebrow">From download to finished file</div>
+        <h2>Up and running in under 5 minutes</h2>
+      </div>
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-num">1</div>
+          <h3>Download Devgent</h3>
+          <p>One executable for your OS. No installer maze, no bundled Python interpreter to fight with.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">2</div>
+          <h3>Grab a free Gemini key</h3>
+          <p>About 60 seconds at Google AI Studio. No credit card, no payment method required.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">3</div>
+          <h3>Say what you need</h3>
+          <p>"Build a pitch deck for Q3," "write this script," "make a budget spreadsheet" — plain English.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-num">4</div>
+          <h3>Approve, then open it</h3>
+          <p>Devgent asks before it acts, then hands you a finished file sitting in your chosen folder.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= OPEN SOURCE / BYOK ================= -->
+  <section class="section-pad" style="background:var(--panel);border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="section-eyebrow">No catch, by design</div>
+        <h2>Free because it's actually yours</h2>
+      </div>
+      <div class="split-panel">
+        <div class="info-card reveal">
+          <h3>🔓 Open source, MIT licensed</h3>
+          <p>The full source is public. Read it, audit it, modify it, or fork it — there's no closed backend deciding what Devgent is allowed to do.</p>
+          <ul>
+            <li>No telemetry hidden in a compiled binary you can't inspect</li>
+            <li>Community contributions and issues welcome</li>
+            <li>Build it yourself from source if you'd rather not trust a download</li>
+          </ul>
+        </div>
+        <div class="info-card reveal">
+          <h3>🔑 Bring your own key</h3>
+          <p>Devgent has no servers of its own. Your Gemini API key is stored locally in <code>~/.devgent/config.json</code> and talks directly to Google's API from your machine.</p>
+          <ul>
+            <li>Nothing routes through a third-party server</li>
+            <li>Your key never gets bundled into a shared build</li>
+            <li>Prefer zero cloud calls? Run it against local Ollama instead</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FAQ ================= -->
+  <section class="section-pad" id="faq">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="section-eyebrow">Before you ask</div>
+        <h2>Questions people actually have</h2>
+      </div>
+      <div class="faq-list reveal">
+        <div class="faq-item">
+          <button class="faq-q">Is Devgent really free? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Yes, permanently. Devgent itself costs nothing and is open source. The only thing you provide is a Gemini API key, and Google's free tier is enough to chat and generate documents with Devgent normally.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">Do I need to know how to code? <span class="plus">+</span></button>
+          <div class="faq-a"><p>No. You describe what you want in plain English — a document, a deck, a spreadsheet, a script — and Devgent handles the file format and structure. Coding knowledge only helps if you're using it to write and run code yourself.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">Is my API key safe? <span class="plus">+</span></button>
+          <div class="faq-a"><p>It's saved in a small local config file outside the app itself, so rebuilding or redistributing Devgent never leaks anyone's key. It's sent only to Google's Gemini API when you send a message — never to any Devgent-run server, because there isn't one.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">What if I don't want to use Gemini at all? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Switch the execution engine to Ollama in the sidebar and point it at a local model like deepseek-coder. Everything runs on your machine with no cloud calls and no API key needed.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">Will it touch my files without asking? <span class="plus">+</span></button>
+          <div class="faq-a"><p>No. Every action that creates or overwrites a file, runs a terminal command, or starts a dev server shows a confirmation prompt first. If you click no, Devgent won't silently retry it.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-q">What can't it do? <span class="plus">+</span></button>
+          <div class="faq-a"><p>Devgent is a desktop assistant, not an autonomous agent — it waits for your approval before acting, and output quality depends on the model you connect it to. It's built for getting real files and code done, not for replacing your judgment on what to send or ship.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FINAL CTA ================= -->
+  <section class="final-cta" id="final-download">
+    <div class="wrap">
+      <h2>Stop switching apps. Start finishing things.</h2>
+      <p>Free forever, open source, and running on your machine in a couple of minutes.</p>
+      <div class="hero-ctas">
+        <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-windows.zip" class="btn btn-primary">⊞ Download for Windows</a>
+        <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-macos.zip" class="btn btn-outline"> macOS</a>
+        <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-linux.zip" class="btn btn-outline">⌘ Linux</a>
+      </div>
+      <p class="hero-fineprint">No account, no credit card, no trial period. Just download and go.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-row">
+    <div class="brand" style="font-size:16px;">
+      <span class="brand-mark" style="width:22px;height:22px;font-size:11px;">D</span>
+      Devgent
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/YOUR-USERNAME/devgent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/YOUR-USERNAME/devgent/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a Gemini key</a>
+      <a href="#faq">FAQ</a>
     </div>
   </div>
+  <div class="wrap" style="margin-top:20px;">
+    <p class="footer-note">Devgent is free, open-source software. Not affiliated with Google or the Gemini API beyond using it as a BYOK provider.</p>
+  </div>
+</footer>
 
-  <!-- Key Features -->
-  <section class="features-section">
-    <h2 class="section-title">Key Capabilities</h2>
-    <div class="features-grid">
-      <div class="feature-card">
-        <h3>Automated File Generation</h3>
-        <p>Generate, scaffold, and edit project source files locally with precision through dynamic AI tool execution.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Integrated Terminal Execution</h3>
-        <p>Safely run CLI commands and build scripts directly within your workspace environment.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Dynamic Memory Management</h3>
-        <p>Keep track of essential context, developer preferences, and build options across sessions without bloating prompts.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Native Desktop Interface</h3>
-        <p>Built with PyQt6 for a lightweight, responsive local GUI tailored for fast desktop workflows.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Standalone Executable</h3>
-        <p>Runs as a single, compiled local binary—no runtime dependencies or Python setup required for end users.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Multi-Document Parsing</h3>
-        <p>Built-in support for reading and parsing markdown, docs, spreadsheets, presentation decks, and PDFs.</p>
-      </div>
-    </div>
-  </section>
+<script>
+  // ---------- Mockup: scripted "live agent" sequence ----------
+  const sequence = [
+    { type: 'user', text: 'Build a pitch deck for our Q3 product launch' },
+    { type: 'typing' },
+    { type: 'agent', label: 'DEVGENT', text: "On it — I'll put together a title slide, key features, a growth chart, and a closing slide." },
+    { type: 'perm', text: 'Devgent wants to create <b>q3_launch.pptx</b> in /Documents' },
+    { type: 'action', text: '<span class="filename">q3_launch.pptx</span> created — 6 slides, 1 chart' }
+  ];
+  const mockupBody = document.getElementById('mockupBody');
+  let seqIndex = 0;
 
-  <!-- Download Call to Action -->
-  <section id="download" class="download-section">
-    <h2>Ready to speed up your workflow?</h2>
-    <p>Download the latest release for Windows.</p>
-    <a href="Devgent.exe" class="download-btn" download>Download Devgent.exe</a>
-  </section>
+  function renderStep() {
+    if (seqIndex >= sequence.length) {
+      setTimeout(() => { mockupBody.innerHTML = ''; seqIndex = 0; renderStep(); }, 2600);
+      return;
+    }
+    const step = sequence[seqIndex];
+    if (step.type === 'typing') {
+      const el = document.createElement('div');
+      el.className = 'bubble bubble-agent';
+      el.innerHTML = '<span class="label">DEVGENT</span><span class="typing-dots"><span></span><span></span><span></span></span>';
+      mockupBody.appendChild(el);
+      setTimeout(() => { el.remove(); seqIndex++; renderStep(); }, 900);
+      return;
+    }
+    let el = document.createElement('div');
+    if (step.type === 'user') {
+      el.className = 'bubble bubble-user';
+      el.textContent = step.text;
+    } else if (step.type === 'agent') {
+      el.className = 'bubble bubble-agent';
+      el.innerHTML = `<span class="label">${step.label}</span>${step.text}`;
+    } else if (step.type === 'perm') {
+      el.className = 'perm-card';
+      el.innerHTML = `${step.text}<div class="row"><span class="perm-btn perm-yes">Yes, proceed</span><span class="perm-btn">No</span></div>`;
+    } else if (step.type === 'action') {
+      el.className = 'action-card';
+      el.innerHTML = `<span class="check">✓</span>${step.text}`;
+    }
+    mockupBody.appendChild(el);
+    while (mockupBody.children.length > 5) mockupBody.removeChild(mockupBody.firstChild);
+    seqIndex++;
+    setTimeout(renderStep, step.type === 'user' ? 1000 : 1500);
+  }
+  renderStep();
 
-  <footer>
-    <p>&copy; Devgent. Built for developers.</p>
-  </footer>
+  // ---------- Marquee ----------
+  const files = ['.pptx — decks', '.docx — documents', '.xlsx — spreadsheets', '.pdf — reports', '.py — scripts', '.js — apps', '.html — pages', '.json — data'];
+  const track = document.getElementById('marqueeTrack');
+  [...files, ...files].forEach(f => {
+    const [ext, label] = f.split(' — ');
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `<b>${ext}</b> ${label}`;
+    track.appendChild(chip);
+  });
 
+  // ---------- FAQ accordion ----------
+  document.querySelectorAll('.faq-item').forEach(item => {
+    const q = item.querySelector('.faq-q');
+    const a = item.querySelector('.faq-a');
+    q.addEventListener('click', () => {
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(o => {
+        o.classList.remove('open');
+        o.querySelector('.faq-a').style.maxHeight = null;
+      });
+      if (!isOpen) {
+        item.classList.add('open');
+        a.style.maxHeight = a.scrollHeight + 'px';
+      }
+    });
+  });
+
+  // ---------- Scroll reveal ----------
+  const revealEls = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  revealEls.forEach(el => io.observe(el));
+
+  // ---------- OS auto-detect: highlight the right download button ----------
+  (function(){
+    const ua = navigator.userAgent;
+    let os = 'Windows';
+    if (/Mac/i.test(ua)) os = 'macOS';
+    else if (/Linux/i.test(ua)) os = 'Linux';
+    document.querySelectorAll('[data-os]').forEach(btn => {
+      if (btn.dataset.os === os) {
+        btn.classList.remove('btn-outline');
+        btn.classList.add('btn-primary');
+      } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+      }
+    });
+  })();
+</script>
 </body>
 </html>
