@@ -323,9 +323,10 @@
       <a href="#demo">Demo</a>
       <a href="#how">How it works</a>
       <a href="#faq">FAQ</a>
+      <a href="chat.html">Web chat</a>
     </div>
     <div class="nav-cta">
-      <a class="ghost-link" href="https://github.com/akasula09/devgent" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="ghost-link" href="https://github.com/akasula09/Devgent" target="_blank" rel="noopener">GitHub ↗</a>
       <a class="btn btn-primary btn-sm" href="#download">Download free</a>
     </div>
   </nav>
@@ -336,15 +337,18 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <div class="eyebrow"><span class="dot"></span>COMPLETELY FREE · OPEN SOURCE · GNU LICENSE</div>
+        <div class="eyebrow"><span class="dot"></span>FREE FOREVER · OPEN SOURCE · GNU LICENSE</div>
         <h1>Your computer,<br>finally doing <span class="accent">the typing.</span></h1>
         <p class="lead">Devgent is a desktop AI agent that doesn't just talk about the work — it makes the Word doc, builds the slide deck, fills the spreadsheet, writes and runs the code. You approve every step. It ships the file.</p>
         <div class="hero-ctas" id="download">
           <a href="https://github.com/akasula09/Devgent/releases/download/v1.0.0/devgent_windows.zip" class="btn btn-primary" data-os="Windows">⊞ Download for Windows</a>
-          <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-macos.zip" class="btn btn-outline" data-os="macOS"> Download for macOS</a>
-          <a href="https://github.com/akasula09/Devgent/actions/runs/31857524592/artifacts/9240067895" class="btn btn-outline" data-os="Linux">⌘ Download for Linux</a>
+          <a href="https://github.com/akasula09/Devgent/releases/download/v1.0.0/Devgent-linux.zip" class="btn btn-outline" data-os="Linux">⌘ Download for Linux</a>
+        </div>
+        <div class="hero-ctas" style="margin-top:2px;">
+          <a href="chat.html" class="btn btn-outline" style="border-color:rgba(56,189,248,0.35);">💬 Or use Devgent in your browser — no download</a>
         </div>
         <p class="hero-fineprint"><strong>No account. No credit card. No trial.</strong> Just plug in a free Gemini API key and start building — takes about 2 minutes.</p>
+        <p class="hero-fineprint" style="margin-top:-14px;">No macOS build yet — the browser version above works on any OS in the meantime.</p>
         <div class="trust-row">
           <div class="trust-chip">🔓 Fully open source</div>
           <div class="trust-chip">🔑 Bring your own free API key</div>
@@ -538,9 +542,9 @@
       <h2>Stop switching apps. Start finishing things.</h2>
       <p>Free forever, open source, and running on your machine in a couple of minutes.</p>
       <div class="hero-ctas">
-        <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-windows.zip" class="btn btn-primary">⊞ Download for Windows</a>
-        <a href="https://github.com/YOUR-USERNAME/devgent/releases/latest/download/Devgent-macos.zip" class="btn btn-outline"> macOS</a>
+        <a href="https://github.com/akasula09/Devgent/releases/download/v1.0.0/devgent_windows.zip" class="btn btn-primary">⊞ Windows</a>
         <a href="https://github.com/akasula09/Devgent/releases/download/v1.0.0/Devgent-linux.zip" class="btn btn-outline">⌘ Linux</a>
+        <a href="chat.html" class="btn btn-outline" style="border-color:rgba(56,189,248,0.35);">💬 Use in browser</a>
       </div>
       <p class="hero-fineprint">No account, no credit card, no trial period. Just download and go.</p>
     </div>
@@ -554,8 +558,8 @@
       Devgent
     </div>
     <div class="footer-links">
-      <a href="https://github.com/YOUR-USERNAME/devgent" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://github.com/YOUR-USERNAME/devgent/blob/main/LICENSE" target="_blank" rel="noopener">GNU License</a>
+      <a href="https://github.com/akasula09/Devgent" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/akasula09/Devgent/blob/main/LICENSE" target="_blank" rel="noopener">GNU License</a>
       <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a Gemini key</a>
       <a href="#faq">FAQ</a>
     </div>
@@ -651,10 +655,10 @@
   (function(){
     const ua = navigator.userAgent;
     let os = 'Windows';
-    if (/Mac/i.test(ua)) os = 'macOS';
-    else if (/Linux/i.test(ua)) os = 'Linux';
+    if (/Linux/i.test(ua) && !/Android/i.test(ua)) os = 'Linux';
+    if (/Mac/i.test(ua) || /Android/i.test(ua)) os = null; // no native build — steer to the web app instead
     document.querySelectorAll('[data-os]').forEach(btn => {
-      if (btn.dataset.os === os) {
+      if (os && btn.dataset.os === os) {
         btn.classList.remove('btn-outline');
         btn.classList.add('btn-primary');
       } else {
