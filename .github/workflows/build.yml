@@ -34,9 +34,19 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Install your app's own dependencies here. Edit this list to match
-      # everything AIAgent.py imports (PyQt6, requests, markdown2,
-      # python-docx, openpyxl, pypdf, reportlab, python-pptx, google-genai).
+      # Install C compiler for Nuitka across platforms
+      - name: Install C Compiler (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc g++
+
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Note: macOS-latest runners already have Xcode Command Line Tools / Clang pre-installed.
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -47,7 +57,7 @@ jobs:
       # --onefile: pack it into a single executable file
       # --enable-plugin=pyqt6: teach Nuitka how to handle PyQt6 correctly
       # --windows-console-mode=disable: no background console window (Windows only, harmless elsewhere)
-      # --assume-yes-for-downloads: let Nuitka fetch its helper tools without prompting
+      # --assume-yes-for-downloads: let Nuitka fetch its helper tools (like MinGW on Windows if MSVC isn't used) automatically
       - name: Build with Nuitka
         run: |
           python -m nuitka --standalone --onefile --enable-plugin=pyqt6 --windows-console-mode=disable --assume-yes-for-downloads --output-dir=build AIAgent.py
