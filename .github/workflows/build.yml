@@ -51,7 +51,7 @@ jobs:
       # Build with Nuitka
       - name: Build with Nuitka
         run: |
-          python -m nuitka --standalone --onefile --enable-plugin=pyqt6 --windows-console-mode=disable --assume-yes-for-downloads --jobs=max --output-dir=build AIAgent.py
+          python -m nuitka --standalone --onefile --enable-plugin=pyqt6 --windows-console-mode=disable --assume-yes-for-downloads --jobs=2 --output-dir=build AIAgent.py
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
