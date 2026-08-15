@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devgent — Web Chat</title>
+<meta name="description" content="Chat with Devgent in your browser. Build Word docs, decks, spreadsheets, PDFs, and code — free with your own Gemini API key.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js"></script>
+<style>
+  :root{
+    --bg:#060912; --panel:#0D1420; --panel-2:#111A2B; --panel-3:#16213A;
+    --border:#1D2A3F; --border-soft:#16202F;
+    --text:#F1F5F9; --muted:#8B9AB3; --muted-dim:#5C6B84;
+    --blue:#3B82F6; --blue-bright:#5B9BFF; --cyan:#38BDF8; --green:#10B981; --red:#F87171;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    display:flex;overflow:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;
+    background:radial-gradient(ellipse 900px 500px at 10% -10%, rgba(59,130,246,0.14), transparent 60%),
+               radial-gradient(ellipse 700px 500px at 100% 100%, rgba(56,189,248,0.08), transparent 60%);
+    pointer-events:none;z-index:0;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:var(--cyan);}
+
+  /* ---------- SIDEBAR ---------- */
+  #sidebar{
+    width:290px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border-soft);
+    display:flex;flex-direction:column;padding:20px 18px;gap:18px;position:relative;z-index:22;
+    overflow-y:auto;transition:width .22s ease, padding .22s ease, opacity .18s ease;
+  }
+  #sidebar.closed{width:0;padding:20px 0;opacity:0;overflow:hidden;border-right:none;pointer-events:none;}
+  .sidebar-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  #sidebarCloseBtn{
+    background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;
+    width:28px;height:28px;flex-shrink:0;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;
+  }
+  #sidebarCloseBtn:hover{border-color:var(--red);color:var(--red);}
+  #sidebarBackdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:21;
+  }
+  #sidebarBackdrop.show{display:block;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;white-space:nowrap;}
+  .brand-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#04101f;flex-shrink:0;}
+  .brand small{display:block;font-family:'Inter';font-weight:400;font-size:11px;color:var(--muted-dim);margin-top:1px;}
+  .field-label{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;display:block;}
+  select, input[type=password], input[type=text]{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+    padding:9px 11px;color:var(--text);font-family:'Inter';font-size:13.5px;outline:none;
+  }
+  select:focus, input:focus{border-color:var(--blue-bright);}
+  .hint{font-size:11px;color:var(--muted-dim);margin-top:6px;line-height:1.5;}
+  .hint a{color:var(--cyan);text-decoration:none;}
+  .hint a:hover{text-decoration:underline;}
+  .side-block{border-bottom:1px solid var(--border-soft);padding-bottom:18px;}
+  .side-block:last-of-type{border-bottom:none;}
+
+  #keyStatus{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted-dim);margin-top:8px;}
+  #keyStatus .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-dim);}
+  #keyStatus.ok .dot{background:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,0.2);}
+  #keyStatus.ok{color:var(--green);}
+  #keyStatus.flash{color:var(--cyan);}
+  #keyStatus.flash .dot{background:var(--cyan);box-shadow:0 0 0 3px rgba(56,189,248,0.25);}
+
+  #memoryBox{
+    background:var(--panel-2);border:1px solid var(--border-soft);border-radius:8px;
+    padding:10px 11px;font-size:11.5px;color:var(--cyan);max-height:190px;overflow-y:auto;
+    white-space:pre-wrap;word-break:break-word;line-height:1.6;
+  }
+  #memoryBox:empty::before, #memoryBox.empty::before{content:"No stored memories yet.";color:var(--muted-dim);}
+  .clear-btn{
+    margin-top:10px;width:100%;background:none;border:1px solid var(--border);color:var(--muted);
+    border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:'Inter';
+  }
+  .clear-btn:hover{border-color:var(--red);color:var(--red);}
+
+  .sidebar-footer{margin-top:auto;font-size:11px;color:var(--muted-dim);line-height:1.6;padding-top:10px;}
+  .sidebar-footer a{color:var(--muted);}
+
+  /* ---------- CHAT AREA ---------- */
+  #chatArea{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-index:1;}
+  #chatHeader{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 26px;
+    border-bottom:1px solid var(--border-soft);background:rgba(6,9,18,0.6);backdrop-filter:blur(10px);
+  }
+  #chatHeader h1{font-family:'Space Grotesk';font-size:15.5px;margin:0;font-weight:600;}
+  #chatHeader .back-link{font-size:12.5px;color:var(--muted);text-decoration:none;display:flex;align-items:center;gap:5px;}
+  #chatHeader .back-link:hover{color:var(--text);}
+  #menuToggle{display:flex;align-items:center;justify-content:center;background:none;border:1px solid var(--border);color:var(--text);border-radius:7px;width:34px;height:34px;cursor:pointer;font-size:16px;flex-shrink:0;}
+  #menuToggle:hover{border-color:var(--blue-bright);color:var(--blue-bright);}
+
+  #messages{flex:1;overflow-y:auto;padding:26px 0 10px;}
+  #messagesInner{max-width:820px;margin:0 auto;padding:0 26px;display:flex;flex-direction:column;gap:20px;}
+
+  .msg{display:flex;gap:12px;max-width:100%;}
+  .msg-avatar{
+    width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono';font-size:12px;font-weight:600;margin-top:2px;
+  }
+  .msg.user{flex-direction:row-reverse;}
+  .msg.user .msg-avatar{background:var(--panel-3);color:var(--muted);}
+  .msg.agent .msg-avatar{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#04101f;}
+  .msg-bubble{
+    background:var(--panel);border:1px solid var(--border-soft);border-radius:12px;
+    padding:13px 16px;font-size:14.5px;line-height:1.65;max-width:640px;
+  }
+  .msg.user .msg-bubble{background:var(--blue);border-color:transparent;color:#fff;}
+  .msg.agent .msg-bubble{}
+  .msg-bubble p{margin:0 0 10px;}
+  .msg-bubble p:last-child{margin-bottom:0;}
+  .msg-bubble ul, .msg-bubble ol{margin:0 0 10px;padding-left:20px;}
+  .msg-bubble pre{
+    background:#04070E;border:1px solid var(--border-soft);border-radius:8px;padding:12px 14px;
+    overflow-x:auto;margin:10px 0;font-size:12.5px;
+  }
+  .msg-bubble code{font-family:'JetBrains Mono',monospace;font-size:12.5px;}
+  .msg-bubble :not(pre) > code{background:rgba(56,189,248,0.12);color:var(--cyan);padding:1px 5px;border-radius:4px;}
+  .msg-bubble table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px;}
+  .msg-bubble th, .msg-bubble td{border:1px solid var(--border);padding:6px 9px;text-align:left;}
+  .msg-bubble th{background:var(--panel-2);}
+  .msg-bubble a{color:var(--cyan);}
+  .msg.user .msg-bubble a{color:#fff;text-decoration:underline;}
+  .attach-chip{
+    display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono';font-size:11px;
+    background:rgba(255,255,255,0.12);padding:4px 9px;border-radius:6px;margin-top:8px;
+  }
+
+  .typing-indicator{display:flex;gap:4px;align-items:center;padding:4px 0;}
+  .typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite ease-in-out;}
+  .typing-indicator span:nth-child(2){animation-delay:.2s;}
+  .typing-indicator span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
+
+  .file-card{
+    display:flex;align-items:center;gap:12px;background:rgba(16,185,129,0.07);
+    border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:11px 14px;margin-top:10px;
+  }
+  .file-card .check{width:26px;height:26px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:13px;color:#04120c;font-weight:700;flex-shrink:0;}
+  .file-card .info{flex:1;min-width:0;}
+  .file-card .fname{font-family:'JetBrains Mono';font-size:13px;color:#6EE7B7;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .file-card .fsize{font-size:11px;color:var(--muted-dim);}
+  .file-card .dl-btn{
+    background:var(--green);color:#04120c;border:none;border-radius:7px;padding:7px 13px;
+    font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:'Inter';
+  }
+  .file-card .dl-btn:hover{background:#0EA371;}
+
+  .system-note{font-size:12px;color:var(--muted-dim);text-align:center;padding:4px 0;}
+
+  /* ---------- INPUT DOCK ---------- */
+  #inputDock{padding:16px 26px 22px;border-top:1px solid var(--border-soft);}
+  #inputInner{max-width:820px;margin:0 auto;}
+  #attachPreview{
+    display:none;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:8px;padding:7px 11px;margin-bottom:8px;font-size:12.5px;color:var(--muted);width:fit-content;
+  }
+  #attachPreview.show{display:flex;}
+  #attachPreview button{background:none;border:none;color:var(--muted-dim);cursor:pointer;font-size:14px;padding:0 2px;}
+  #attachPreview button:hover{color:var(--red);}
+
+  #inputRow{
+    display:flex;align-items:flex-end;gap:8px;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:8px 8px 8px 14px;
+  }
+  #inputRow:focus-within{border-color:var(--blue-bright);}
+  #userInput{
+    flex:1;background:none;border:none;outline:none;color:var(--text);font-family:'Inter';
+    font-size:14.5px;resize:none;max-height:160px;line-height:1.5;padding:8px 0;
+  }
+  #userInput::placeholder{color:var(--muted-dim);}
+  .icon-btn{
+    width:38px;height:38px;border-radius:9px;border:none;background:var(--panel-2);color:var(--muted);
+    cursor:pointer;flex-shrink:0;font-size:16px;display:flex;align-items:center;justify-content:center;
+    transition:background .15s, color .15s;
+  }
+  .icon-btn:hover{background:var(--panel-3);color:var(--text);}
+  #sendBtn{background:linear-gradient(135deg,var(--blue),#2563EB);color:#fff;}
+  #sendBtn:hover{background:linear-gradient(135deg,var(--blue-bright),var(--blue));}
+  #sendBtn:disabled{opacity:.45;cursor:not-allowed;}
+  #inputFinePrint{text-align:center;font-size:11px;color:var(--muted-dim);margin-top:9px;}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:860px){
+    #sidebar{
+      position:fixed;left:0;top:0;bottom:0;width:290px;padding:20px 18px;opacity:1;
+      transform:translateX(0);transition:transform .22s ease;box-shadow:20px 0 40px rgba(0,0,0,0.45);
+      overflow-y:auto;pointer-events:auto;border-right:1px solid var(--border-soft);
+    }
+    #sidebar.closed{
+      transform:translateX(-100%);width:290px;padding:20px 18px;opacity:1;overflow-y:auto;
+      pointer-events:auto;border-right:1px solid var(--border-soft);
+    }
+    .msg-bubble{max-width:calc(100vw - 130px);}
+  }
+</style>
+</head>
+<body>
+
+<div id="sidebarBackdrop"></div>
+<aside id="sidebar">
+  <div class="sidebar-top">
+    <div class="brand">
+      <span class="brand-mark">D</span>
+      <div>Devgent<small>Web Chat</small></div>
+    </div>
+    <button id="sidebarCloseBtn" title="Close sidebar">✕</button>
+  </div>
+
+  <div class="side-block">
+    <span class="field-label">Execution engine</span>
+    <select id="modelSelect">
+      <option value="gemini-3.6-flash">Devgent Ultra Heavyweight (gemini-3.6-flash)</option>
+      <option value="gemini-3.5-flash-lite">Devgent Turbo Speed (gemini-3.5-flash-lite)</option>
+    </select>
+  </div>
+
+  <div class="side-block">
+    <span class="field-label">Gemini API key</span>
+    <input type="password" id="apiKeyInput" placeholder="Paste your free Gemini API key">
+    <div id="keyStatus"><span class="dot"></span><span id="keyStatusText">No key set</span></div>
+    <p class="hint">It's free — type <strong>help</strong> in chat if you need one, or grab one directly at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.</p>
+  </div>
+
+  <div class="side-block">
+    <span class="field-label">Active persistent memory</span>
+    <div id="memoryBox" class="empty"></div>
+    <button class="clear-btn" id="clearMemoryBtn">Clear memory</button>
+  </div>
+
+  <div class="side-block" style="border-bottom:none;">
+    <button class="clear-btn" id="clearChatBtn">Start new conversation</button>
+  </div>
+
+  <div class="sidebar-footer">
+    Files Devgent creates are handed to you as direct downloads — nothing is uploaded or stored on a server.
+    <br><br>
+    <a href="index.html">← Back to devgent.dev</a>
+  </div>
+</aside>
+
+<main id="chatArea">
+  <div id="chatHeader">
+    <button id="menuToggle">☰</button>
+    <h1>Devgent — Desktop Agent Workspace</h1>
+    <a class="back-link" href="index.html">↓ Download desktop app</a>
+  </div>
+
+  <div id="messages"><div id="messagesInner"></div></div>
+
+  <div id="inputDock">
+    <div id="inputInner">
+      <div id="attachPreview"><span id="attachName"></span><button id="attachRemove" title="Remove attachment">✕</button></div>
+      <div id="inputRow">
+        <button class="icon-btn" id="attachBtn" title="Attach a file">📎</button>
+        <textarea id="userInput" rows="1" placeholder="Ask Devgent to build something — a Word doc, a deck, a spreadsheet, a script…"></textarea>
+        <button class="icon-btn" id="sendBtn" title="Send">➤</button>
+      </div>
+      <p id="inputFinePrint">Devgent asks before assuming — vague requests get a clarifying question, not a guess.</p>
+      <input type="file" id="fileInput" style="display:none" accept=".txt,.md,.py,.js,.html,.css,.json,.docx,.xlsx,.pdf,.csv">
+    </div>
+  </div>
+</main>
+
+<script>
+  marked.setOptions({ breaks: true, gfm: true });
+
+  const API_ENDPOINT = '/api/AIProcess';
+
+  const $ = (id) => document.getElementById(id);
+  const messagesInner = $('messagesInner');
+  const userInput = $('userInput');
+  const sendBtn = $('sendBtn');
+  const apiKeyInput = $('apiKeyInput');
+  const modelSelect = $('modelSelect');
+  const keyStatus = $('keyStatus');
+  const keyStatusText = $('keyStatusText');
+  const memoryBox = $('memoryBox');
+  const fileInput = $('fileInput');
+  const attachBtn = $('attachBtn');
+  const attachPreview = $('attachPreview');
+  const attachName = $('attachName');
+  const attachRemove = $('attachRemove');
+  const sidebar = $('sidebar');
+  const menuToggle = $('menuToggle');
+  const sidebarCloseBtn = $('sidebarCloseBtn');
+  const sidebarBackdrop = $('sidebarBackdrop');
+
+  // ---------- Persisted state ----------
+  let memory = JSON.parse(localStorage.getItem('devgent_memory') || '{}');
+  let history = []; // {role: 'user'|'model', content} — resets each page load, like the desktop app
+  let pendingAttachment = null; // {filename, data_base64}
+
+  apiKeyInput.value = localStorage.getItem('devgent_api_key') || '';
+  modelSelect.value = localStorage.getItem('devgent_model') || 'gemini-3.6-flash';
+  updateKeyStatus();
+  renderMemory();
+
+  apiKeyInput.addEventListener('input', handleApiKeyChange);
+  apiKeyInput.addEventListener('change', handleApiKeyChange);
+  apiKeyInput.addEventListener('paste', () => setTimeout(handleApiKeyChange, 0));
+
+  let flashTimer = null;
+  function handleApiKeyChange(){
+    const val = apiKeyInput.value.trim();
+    localStorage.setItem('devgent_api_key', val);
+    updateKeyStatus();
+    if (val){
+      keyStatus.classList.add('flash');
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => keyStatus.classList.remove('flash'), 1200);
+    }
+  }
+  modelSelect.addEventListener('change', () => localStorage.setItem('devgent_model', modelSelect.value));
+
+  function updateKeyStatus(){
+    const has = apiKeyInput.value.trim().length > 0;
+    keyStatus.classList.toggle('ok', has);
+    keyStatusText.textContent = has ? 'Key saved — connected' : 'No key set';
+  }
+
+  function renderMemory(){
+    const keys = Object.keys(memory);
+    if (keys.length === 0){ memoryBox.textContent = ''; memoryBox.classList.add('empty'); return; }
+    memoryBox.classList.remove('empty');
+    memoryBox.textContent = JSON.stringify(memory, null, 2);
+  }
+
+  $('clearMemoryBtn').addEventListener('click', () => {
+    memory = {};
+    localStorage.setItem('devgent_memory', '{}');
+    renderMemory();
+  });
+  $('clearChatBtn').addEventListener('click', () => {
+    history = [];
+    messagesInner.innerHTML = '';
+    if (apiKeyInput.value.trim()){
+      addAgentMessage("New conversation started. What are we building today?");
+    } else {
+      addAgentMessage("New conversation started. You still don't have a Gemini API key set — open the sidebar and paste one in, or reply **help** for instructions.");
+    }
+  });
+
+  // ---------- Sidebar open/close (closable on desktop and mobile, remembers choice) ----------
+  const isMobile = () => window.matchMedia('(max-width:860px)').matches;
+
+  function setSidebar(open){
+    sidebar.classList.toggle('closed', !open);
+    sidebarBackdrop.classList.toggle('show', open && isMobile());
+    localStorage.setItem('devgent_sidebar_open', open ? '1' : '0');
+  }
+
+  const savedSidebarState = localStorage.getItem('devgent_sidebar_open');
+  const initialOpen = savedSidebarState === null ? !isMobile() : savedSidebarState === '1';
+  setSidebar(initialOpen);
+
+  menuToggle.addEventListener('click', () => setSidebar(sidebar.classList.contains('closed')));
+  sidebarCloseBtn.addEventListener('click', () => setSidebar(false));
+  sidebarBackdrop.addEventListener('click', () => setSidebar(false));
+
+  // ---------- Attachment handling ----------
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      pendingAttachment = { filename: file.name, data_base64: base64 };
+      attachName.textContent = '📎 ' + file.name;
+      attachPreview.classList.add('show');
+    };
+    reader.readAsDataURL(file);
+  });
+  attachRemove.addEventListener('click', () => {
+    pendingAttachment = null;
+    fileInput.value = '';
+    attachPreview.classList.remove('show');
+  });
+
+  // ---------- Auto-resize textarea ----------
+  userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+  });
+  userInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+
+  // ---------- Message rendering ----------
+  function scrollToBottom(){ $('messages').scrollTop = $('messages').scrollHeight; }
+
+  function renderMarkdown(text){
+    const raw = marked.parse(text || '');
+    return DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
+  }
+
+  function addUserMessage(text, attachmentName){
+    const el = document.createElement('div');
+    el.className = 'msg user';
+    el.innerHTML = `<div class="msg-avatar">You</div><div class="msg-bubble"></div>`;
+    el.querySelector('.msg-bubble').textContent = text;
+    if (attachmentName){
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      chip.textContent = '📎 ' + attachmentName;
+      el.querySelector('.msg-bubble').appendChild(document.createElement('br'));
+      el.querySelector('.msg-bubble').appendChild(chip);
+    }
+    messagesInner.appendChild(el);
+    scrollToBottom();
+  }
+
+  function addAgentMessage(markdownText){
+    const el = document.createElement('div');
+    el.className = 'msg agent';
+    el.innerHTML = `<div class="msg-avatar">D</div><div class="msg-bubble">${renderMarkdown(markdownText)}</div>`;
+    messagesInner.appendChild(el);
+    scrollToBottom();
+    return el;
+  }
+
+  function addTypingBubble(){
+    const el = document.createElement('div');
+    el.className = 'msg agent';
+    el.innerHTML = `<div class="msg-avatar">D</div><div class="msg-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+    messagesInner.appendChild(el);
+    scrollToBottom();
+    return el;
+  }
+
+  function addFileCards(bubbleEl, files){
+    files.forEach(f => {
+      const bytes = atob(f.data_base64);
+      const sizeKb = (bytes.length / 1024).toFixed(1);
+      const card = document.createElement('div');
+      card.className = 'file-card';
+      card.innerHTML = `
+        <div class="check">✓</div>
+        <div class="info"><span class="fname">${f.filename}</span><span class="fsize">${sizeKb} KB — ready to download</span></div>
+        <button class="dl-btn">Download</button>`;
+      card.querySelector('.dl-btn').addEventListener('click', () => downloadFile(f));
+      bubbleEl.appendChild(card);
+    });
+  }
+
+  function downloadFile(f){
+    const byteChars = atob(f.data_base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: f.mimetype || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = f.filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // ---------- Send flow ----------
+  async function sendMessage(){
+    const text = userInput.value.trim();
+    if (!text && !pendingAttachment) return;
+
+    const apiKey = apiKeyInput.value.trim();
+    const attachmentForDisplay = pendingAttachment ? pendingAttachment.filename : null;
+
+    addUserMessage(text || '(sent an attachment)', attachmentForDisplay);
+    userInput.value = ''; userInput.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    const typingEl = addTypingBubble();
+
+    try {
+      const res = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: history,
+          apiKey: apiKey,
+          model: modelSelect.value,
+          memory: memory,
+          attachment: pendingAttachment
+        })
+      });
+
+      const data = await res.json();
+      typingEl.remove();
+
+      if (!res.ok){
+        addAgentMessage(`⚠️ ${data.error || 'Something went wrong talking to the Devgent backend.'}`);
+      } else {
+        history.push({ role: 'user', content: text });
+        history.push({ role: 'model', content: data.reply || '' });
+
+        const bubble = addAgentMessage(data.reply || '(no response)');
+        if (data.files && data.files.length){
+          addFileCards(bubble.querySelector('.msg-bubble'), data.files);
+        }
+        if (data.memory){
+          memory = data.memory;
+          localStorage.setItem('devgent_memory', JSON.stringify(memory));
+          renderMemory();
+        }
+      }
+    } catch (err) {
+      typingEl.remove();
+      addAgentMessage(`⚠️ Couldn't reach the Devgent backend: ${err.message}`);
+    } finally {
+      pendingAttachment = null;
+      fileInput.value = '';
+      attachPreview.classList.remove('show');
+      sendBtn.disabled = false;
+      scrollToBottom();
+    }
+  }
+
+  // ---------- Welcome message ----------
+  if (apiKeyInput.value.trim()){
+    addAgentMessage("Welcome back! Dynamic agent memory is online. What are we building today?");
+  } else {
+    addAgentMessage("Hi, I'm Devgent. You seem to not have put a free Gemini API key here — please open the sidebar and put it in. Reply **help** if you want to learn how to get a free Gemini key.");
+  }
+</script>
+</body>
+</html>
