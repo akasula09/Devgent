@@ -1,64 +1,63 @@
 name: Build Devgent Executable
 
+# Runs on every push to main, and can also be triggered manually from the
+# Actions tab (Run workflow button).
 on:
   push:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
+    branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: Devgent-windows
+            binary_glob: build/AIAgent.dist/**
+          - os: ubuntu-latest
+            artifact_name: Devgent-linux
+            binary_glob: build/AIAgent.dist/**
+          - os: macos-latest
+            artifact_name: Devgent-macos
+            binary_glob: build/AIAgent.dist/**
+
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout Repository
+      - name: Check out repo
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.12'
 
-      - name: Generate requirements.txt
-        shell: pwsh
-        run: |
-          @"
-          PyQt6
-          markdown2
-          python-docx
-          openpyxl
-          pypdf
-          reportlab
-          python-pptx
-          google-genai
-          requests
-          "@ | Out-File -FilePath requirements.txt -Encoding utf8
-
-      - name: Install Dependencies
+      # Install your app's own dependencies here. Edit this list to match
+      # everything AIAgent.py imports (PyQt6, requests, markdown2,
+      # python-docx, openpyxl, pypdf, reportlab, python-pptx, google-genai).
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka
-          pip install -r requirements.txt
+          pip install nuitka ordered-set zstandard
+          pip install PyQt6 requests markdown2 python-docx openpyxl pypdf reportlab python-pptx google-genai
 
-      - name: Build Executable with Nuitka
-        shell: pwsh
+      # --standalone: bundle everything needed to run, no system Python required
+      # --onefile: pack it into a single executable file
+      # --enable-plugin=pyqt6: teach Nuitka how to handle PyQt6 correctly
+      # --windows-console-mode=disable: no background console window (Windows only, harmless elsewhere)
+      # --assume-yes-for-downloads: let Nuitka fetch its helper tools without prompting
+      - name: Build with Nuitka
         run: |
-          # Limit C++ compiler heap allocation overhead by capping jobs to 2
-          python -m nuitka `
-            --standalone `
-            --onefile `
-            --enable-plugin=pyqt6 `
-            --windows-console-mode=disable `
-            --low-memory `
-            --jobs=2 `
-            --assume-yes-for-downloads `
-            --output-dir=dist `
-            --output-filename=Devgent.exe `
-            main.py
+          python -m nuitka --standalone --onefile --enable-plugin=pyqt6 --windows-console-mode=disable --assume-yes-for-downloads --output-dir=build AIAgent.py
 
-      - name: Upload Built Executable Artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Devgent-Executable
-          path: dist/Devgent.exe
+          name: ${{ matrix.artifact_name }}
+          path: |
+            build/*.exe
+            build/AIAgent.bin
+            build/AIAgent
+          if-no-files-found: ignore
