@@ -699,7 +699,7 @@ def call_gemini(api_key, model, system_instruction, history, user_message):
         "generationConfig": {"temperature": 0.3},
     }
     url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
-    resp = requests.post(url, json=body, timeout=55)
+    resp = requests.post(url, json=body, timeout=120)
     if resp.status_code != 200:
         detail = ""
         try:
