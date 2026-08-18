@@ -154,8 +154,63 @@
     font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:'Inter';
   }
   .file-card .dl-btn:hover{background:#0EA371;}
+  .file-card .actions{display:flex;gap:6px;flex-shrink:0;}
+  .file-card .ghost-btn{
+    background:none;color:#6EE7B7;border:1px solid rgba(16,185,129,0.4);border-radius:7px;padding:7px 11px;
+    font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Inter';
+  }
+  .file-card .ghost-btn:hover{background:rgba(16,185,129,0.12);}
 
   .system-note{font-size:12px;color:var(--muted-dim);text-align:center;padding:4px 0;}
+
+  /* ---------- CONNECTORS (sidebar) ---------- */
+  .connector-row{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:8px 2px;border-bottom:1px solid var(--border-soft);
+  }
+  .connector-row:last-child{border-bottom:none;}
+  .connector-name{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .connector-dot{width:7px;height:7px;border-radius:50%;background:var(--muted-dim);flex-shrink:0;}
+  .connector-dot.on{background:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,0.2);}
+  .connector-btn{
+    background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;
+    padding:5px 10px;font-size:11.5px;cursor:pointer;font-family:'Inter';
+  }
+  .connector-btn:hover{border-color:var(--blue-bright);color:var(--blue-bright);}
+  .connector-btn.connected{border-color:rgba(16,185,129,0.4);color:#6EE7B7;}
+  .connector-btn.connected:hover{border-color:var(--red);color:var(--red);}
+
+  /* ---------- CONNECTOR SUGGESTION CHIP (in chat) ---------- */
+  .connector-suggest{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    background:rgba(56,189,248,0.07);border:1px solid rgba(56,189,248,0.3);border-radius:10px;
+    padding:10px 14px;margin-top:10px;font-size:13px;color:var(--text);
+  }
+  .connector-suggest .connect-btn{
+    background:var(--cyan);color:#04101f;border:none;border-radius:7px;padding:7px 13px;
+    font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:'Inter';
+  }
+  .connector-suggest .connect-btn:hover{background:#5FCBFA;}
+
+  /* ---------- HTML PREVIEW MODAL ---------- */
+  #previewOverlay{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:60;
+    align-items:center;justify-content:center;padding:30px;
+  }
+  #previewOverlay.show{display:flex;}
+  #previewModal{
+    width:100%;max-width:980px;height:100%;max-height:720px;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;
+  }
+  #previewModalHeader{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+    border-bottom:1px solid var(--border-soft);font-size:13px;color:var(--muted);flex-shrink:0;
+  }
+  #previewModalHeader .fname{color:var(--text);font-family:'JetBrains Mono';}
+  #previewModalClose{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;width:28px;height:28px;cursor:pointer;}
+  #previewModalClose:hover{border-color:var(--red);color:var(--red);}
+  #previewFrame{flex:1;border:none;background:#fff;width:100%;}
+  #previewNote{font-size:11px;color:var(--muted-dim);padding:7px 16px;border-top:1px solid var(--border-soft);flex-shrink:0;}
 
   /* ---------- INPUT DOCK ---------- */
   #inputDock{padding:16px 26px 22px;border-top:1px solid var(--border-soft);}
@@ -232,6 +287,12 @@
   </div>
 
   <div class="side-block">
+    <span class="field-label">Connected tools</span>
+    <div id="connectorsList"></div>
+    <p class="hint">Devgent can read/write these on your behalf once connected — tokens live only in this browser, never on our server.</p>
+  </div>
+
+  <div class="side-block">
     <span class="field-label">Active persistent memory</span>
     <div id="memoryBox" class="empty"></div>
     <button class="clear-btn" id="clearMemoryBtn">Clear memory</button>
@@ -271,8 +332,89 @@
   </div>
 </main>
 
+<div id="previewOverlay">
+  <div id="previewModal">
+    <div id="previewModalHeader">
+      <span>Preview — <span class="fname" id="previewFname"></span></span>
+      <button id="previewModalClose" title="Close">✕</button>
+    </div>
+    <iframe id="previewFrame" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+    <div id="previewNote">Live preview only — offsite links/scripts won't load here, but sibling files Devgent generated in the same batch (e.g. a .js or .css file) are inlined automatically.</div>
+  </div>
+</div>
+
 <script>
   marked.setOptions({ breaks: true, gfm: true });
+
+  // ---------- Connected tools (GitHub / Slack / Notion / Figma / Microsoft 365) ----------
+  const CONNECTOR_META = {
+    github:       { label: 'GitHub' },
+    slack:        { label: 'Slack' },
+    notion:       { label: 'Notion' },
+    figma:        { label: 'Figma' },
+    microsoft365: { label: 'Microsoft 365' },
+  };
+
+  function getConnections(){
+    try { return JSON.parse(localStorage.getItem('devgent_connections') || '{}'); }
+    catch(e){ return {}; }
+  }
+  function setConnection(tool, tokenObjOrNull){
+    const conns = getConnections();
+    if (tokenObjOrNull) conns[tool] = tokenObjOrNull; else delete conns[tool];
+    localStorage.setItem('devgent_connections', JSON.stringify(conns));
+    renderConnectors();
+  }
+
+  function renderConnectors(){
+    const conns = getConnections();
+    const list = $('connectorsList');
+    list.innerHTML = '';
+    Object.keys(CONNECTOR_META).forEach(tool => {
+      const isOn = !!(conns[tool] && conns[tool].access_token);
+      const row = document.createElement('div');
+      row.className = 'connector-row';
+      row.innerHTML = `
+        <span class="connector-name"><span class="connector-dot ${isOn ? 'on' : ''}"></span>${CONNECTOR_META[tool].label}</span>
+        <button class="connector-btn ${isOn ? 'connected' : ''}" data-tool="${tool}">${isOn ? 'Disconnect' : 'Connect'}</button>`;
+      row.querySelector('button').addEventListener('click', () => {
+        if (isOn) setConnection(tool, null); else startOAuthConnect(tool);
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function startOAuthConnect(tool){
+    const popup = window.open(`${API_ENDPOINT}?connect=${tool}`, 'devgent_oauth',
+      'width=560,height=680,menubar=no,toolbar=no');
+    if (!popup){
+      addAgentMessage(`I couldn't open the ${CONNECTOR_META[tool].label} connect popup — your browser may be blocking popups for this site.`);
+    }
+  }
+
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || !data.devgent_oauth) return;
+    if (data.ok && data.access_token){
+      setConnection(data.tool, { access_token: data.access_token });
+      addAgentMessage(`✅ Connected **${CONNECTOR_META[data.tool] ? CONNECTOR_META[data.tool].label : data.tool}**. I can use it from here on.`);
+    } else {
+      addAgentMessage(`⚠️ Couldn't connect ${CONNECTOR_META[data.tool] ? CONNECTOR_META[data.tool].label : data.tool}: ${data.error || 'unknown error'}`);
+    }
+  });
+
+  function addConnectorSuggestions(bubbleEl, suggestions){
+    const conns = getConnections();
+    (suggestions || []).forEach(s => {
+      if (!CONNECTOR_META[s.tool] || (conns[s.tool] && conns[s.tool].access_token)) return; // already connected
+      const chip = document.createElement('div');
+      chip.className = 'connector-suggest';
+      chip.innerHTML = `<span>Want to connect <strong>${CONNECTOR_META[s.tool].label}</strong>${s.reason ? ' — ' + s.reason : ''}?</span>
+        <button class="connect-btn">Connect ${CONNECTOR_META[s.tool].label}</button>`;
+      chip.querySelector('.connect-btn').addEventListener('click', () => startOAuthConnect(s.tool));
+      bubbleEl.appendChild(chip);
+    });
+  }
 
   const API_ENDPOINT = '/api/aiprocess.py';
 
@@ -304,6 +446,7 @@
   modelSelect.value = localStorage.getItem('devgent_model') || 'gemini-3.6-flash';
   updateKeyStatus();
   renderMemory();
+  renderConnectors();
 
   apiKeyInput.addEventListener('input', handleApiKeyChange);
   apiKeyInput.addEventListener('change', handleApiKeyChange);
@@ -439,20 +582,87 @@
     return el;
   }
 
+  const TEXTY_EXT = ['.txt','.md','.py','.js','.jsx','.ts','.css','.html','.htm','.json','.csv','.xml','.yml','.yaml','.svg'];
+  function isTexty(filename){
+    const lower = (filename || '').toLowerCase();
+    return TEXTY_EXT.some(ext => lower.endsWith(ext));
+  }
+  function decodeText(f){
+    const bytes = atob(f.data_base64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(arr);
+  }
+
   function addFileCards(bubbleEl, files){
     files.forEach(f => {
       const bytes = atob(f.data_base64);
       const sizeKb = (bytes.length / 1024).toFixed(1);
+      const isHtml = /\.html?$/i.test(f.filename);
       const card = document.createElement('div');
       card.className = 'file-card';
       card.innerHTML = `
         <div class="check">✓</div>
         <div class="info"><span class="fname">${f.filename}</span><span class="fsize">${sizeKb} KB — ready to download</span></div>
-        <button class="dl-btn">Download</button>`;
+        <div class="actions">
+          ${isHtml ? '<button class="ghost-btn preview-btn">Preview</button>' : ''}
+          ${isTexty(f.filename) ? '<button class="ghost-btn copy-btn">Copy</button>' : ''}
+          <button class="dl-btn">Download</button>
+        </div>`;
       card.querySelector('.dl-btn').addEventListener('click', () => downloadFile(f));
+      const copyBtn = card.querySelector('.copy-btn');
+      if (copyBtn) copyBtn.addEventListener('click', () => copyFileContents(f, copyBtn));
+      const previewBtn = card.querySelector('.preview-btn');
+      if (previewBtn) previewBtn.addEventListener('click', () => openHtmlPreview(f, files));
       bubbleEl.appendChild(card);
     });
   }
+
+  function copyFileContents(f, btn){
+    const text = decodeText(f);
+    navigator.clipboard.writeText(text).then(() => {
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1400);
+    }).catch(() => { btn.textContent = "Couldn't copy"; });
+  }
+
+  // Inline sibling generated files (same "group") into an .html file's src/href references
+  // so the preview works without offsite requests (which the sandboxed iframe blocks anyway).
+  function buildPreviewDoc(f, siblingFiles){
+    let html = decodeText(f);
+    const siblings = (siblingFiles || []).filter(s => s.filename !== f.filename &&
+      (!f.group || s.group === f.group || !s.group));
+    siblings.forEach(s => {
+      if (!isTexty(s.filename)) return;
+      const content = decodeText(s);
+      const escapedName = s.filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (/\.js$/i.test(s.filename)){
+        const re = new RegExp(`<script[^>]*src=["']\\.?\\/?${escapedName}["'][^>]*><\\/script>`, 'i');
+        html = html.replace(re, `<script>\n${content}\n<\/script>`);
+      } else if (/\.css$/i.test(s.filename)){
+        const re = new RegExp(`<link[^>]*href=["']\\.?\\/?${escapedName}["'][^>]*>`, 'i');
+        html = html.replace(re, `<style>\n${content}\n</style>`);
+      }
+    });
+    return html;
+  }
+
+  function openHtmlPreview(f, siblingFiles){
+    $('previewFname').textContent = f.filename;
+    $('previewFrame').srcdoc = buildPreviewDoc(f, siblingFiles);
+    $('previewOverlay').classList.add('show');
+  }
+  $('previewModalClose').addEventListener('click', () => {
+    $('previewOverlay').classList.remove('show');
+    $('previewFrame').srcdoc = '';
+  });
+  $('previewOverlay').addEventListener('click', (e) => {
+    if (e.target === $('previewOverlay')){
+      $('previewOverlay').classList.remove('show');
+      $('previewFrame').srcdoc = '';
+    }
+  });
 
   function downloadFile(f){
     const byteChars = atob(f.data_base64);
@@ -490,7 +700,8 @@
           apiKey: apiKey,
           model: modelSelect.value,
           memory: memory,
-          attachment: pendingAttachment
+          attachment: pendingAttachment,
+          connections: getConnections()
         })
       });
 
@@ -506,6 +717,9 @@
         const bubble = addAgentMessage(data.reply || '(no response)');
         if (data.files && data.files.length){
           addFileCards(bubble.querySelector('.msg-bubble'), data.files);
+        }
+        if (data.connector_suggestions && data.connector_suggestions.length){
+          addConnectorSuggestions(bubble.querySelector('.msg-bubble'), data.connector_suggestions);
         }
         if (data.memory){
           memory = data.memory;
