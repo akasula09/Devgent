@@ -372,10 +372,11 @@
     list.innerHTML = '';
     Object.keys(CONNECTOR_META).forEach(tool => {
       const isOn = !!(conns[tool] && conns[tool].access_token);
+      const who = conns[tool] && conns[tool].username;
       const row = document.createElement('div');
       row.className = 'connector-row';
       row.innerHTML = `
-        <span class="connector-name"><span class="connector-dot ${isOn ? 'on' : ''}"></span>${CONNECTOR_META[tool].label}</span>
+        <span class="connector-name"><span class="connector-dot ${isOn ? 'on' : ''}"></span>${CONNECTOR_META[tool].label}${isOn && who ? ` <span style="color:var(--muted-dim);font-weight:400;">— ${who}</span>` : ''}</span>
         <button class="connector-btn ${isOn ? 'connected' : ''}" data-tool="${tool}">${isOn ? 'Disconnect' : 'Connect'}</button>`;
       row.querySelector('button').addEventListener('click', () => {
         if (isOn) setConnection(tool, null); else startOAuthConnect(tool);
@@ -396,8 +397,9 @@
     const data = event.data;
     if (!data || !data.devgent_oauth) return;
     if (data.ok && data.access_token){
-      setConnection(data.tool, { access_token: data.access_token });
-      addAgentMessage(`✅ Connected **${CONNECTOR_META[data.tool] ? CONNECTOR_META[data.tool].label : data.tool}**. I can use it from here on.`);
+      setConnection(data.tool, { access_token: data.access_token, username: data.username || null });
+      const who = data.username ? ` as **${data.username}**` : '';
+      addAgentMessage(`✅ Connected **${CONNECTOR_META[data.tool] ? CONNECTOR_META[data.tool].label : data.tool}**${who}. I can use it from here on.`);
     } else {
       addAgentMessage(`⚠️ Couldn't connect ${CONNECTOR_META[data.tool] ? CONNECTOR_META[data.tool].label : data.tool}: ${data.error || 'unknown error'}`);
     }
