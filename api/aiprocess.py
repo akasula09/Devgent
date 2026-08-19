@@ -129,7 +129,7 @@ CONNECTORS = {
         "label": "Slack",
         "authorize_url": "https://slack.com/oauth/v2/authorize",
         "token_url": "https://slack.com/api/oauth.v2.access",
-        "scope": "chat:write channels:read channels:history groups:history reactions:write",
+        "scope": "chat:write channels:read channels:history groups:history reactions:write users:read channels:manage",
         "user_scope": "",
         "client_id_env": "SLACK_CLIENT_ID",
         "client_secret_env": "SLACK_CLIENT_SECRET",
@@ -137,8 +137,10 @@ CONNECTORS = {
         "setup_help": (
             "1. Go to https://api.slack.com/apps -> \"Create New App\" -> \"From scratch\" (free, any Slack account).\n"
             "2. Under \"OAuth & Permissions\", add redirect URL: <your-site>/api/aiprocess.py?oauth_callback=slack\n"
-            "3. Under \"Bot Token Scopes\" add: chat:write, channels:read, channels:history, groups:history, reactions:write "
-            "(groups:history is needed to read private-channel messages; skip it if you only need public channels).\n"
+            "3. Under \"Bot Token Scopes\" add: chat:write, channels:read, channels:history, groups:history, "
+            "reactions:write, users:read, channels:manage "
+            "(groups:history is needed to read private-channel messages, channels:manage lets Devgent create "
+            "channels — skip either if you don't want that capability).\n"
             "4. Under \"Basic Information\" copy the Client ID and Client Secret.\n"
             "5. Set env vars SLACK_CLIENT_ID and SLACK_CLIENT_SECRET in Vercel."
         ),
@@ -167,18 +169,20 @@ CONNECTORS = {
         "label": "Figma",
         "authorize_url": "https://www.figma.com/oauth",
         "token_url": "https://api.figma.com/v1/oauth/token",
-        "scope": "files:read file_comments:write",
+        "scope": "current_user:read file_content:read file_comments:read file_comments:write",
         "client_id_env": "FIGMA_CLIENT_ID",
         "client_secret_env": "FIGMA_CLIENT_SECRET",
         "auth_style": "form",
         "setup_help": (
             "1. Go to https://www.figma.com/developers/apps -> \"Create new app\" (free).\n"
             "2. Callback URL: <your-site>/api/aiprocess.py?oauth_callback=figma\n"
-            "3. Copy the Client ID and Client secret.\n"
-            "4. Set env vars FIGMA_CLIENT_ID and FIGMA_CLIENT_SECRET in Vercel.\n"
-            "5. Figma's OAuth scope names occasionally change on their end (\"files:read\" vs older \"file_read\") — "
-            "if figma_get_file/figma_export_images 401s, check the exact scope name Figma's dev portal shows for "
-            "your app and update the `scope` value in CONNECTORS[\"figma\"] to match."
+            "3. In the app's scope configuration, select exactly: current_user:read, file_content:read, "
+            "file_comments:read, file_comments:write. Figma's old \"files:read\" scope is deprecated and its "
+            "even-older singular \"file_read\" name was never valid — use these granular scopes instead, and "
+            "make sure the scopes selected in the dashboard match the `scope` value below or Figma will reject "
+            "the request as an invalid scope.\n"
+            "4. Copy the Client ID and Client secret.\n"
+            "5. Set env vars FIGMA_CLIENT_ID and FIGMA_CLIENT_SECRET in Vercel."
         ),
     },
     "microsoft365": {
@@ -266,6 +270,36 @@ def oauth_exchange_code(tool, code, base_url):
     return payload
 
 
+def fetch_identity(tool, token, token_payload):
+    """Best-effort: who did the person just authenticate as? Used so the model can address
+    them by username/workspace instead of asking every time (e.g. GitHub owner defaults)."""
+    try:
+        if tool == "github":
+            r = requests.get("https://api.github.com/user",
+                              headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+                              timeout=15)
+            if r.status_code == 200:
+                return {"username": r.json().get("login")}
+        elif tool == "slack":
+            return {"username": (token_payload.get("team") or {}).get("name")}
+        elif tool == "notion":
+            return {"username": token_payload.get("workspace_name")}
+        elif tool == "figma":
+            r = requests.get("https://api.figma.com/v1/me", headers={"Authorization": f"Bearer {token}"}, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                return {"username": data.get("handle") or data.get("email")}
+        elif tool == "microsoft365":
+            r = requests.get("https://graph.microsoft.com/v1.0/me",
+                              headers={"Authorization": f"Bearer {token}"}, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                return {"username": data.get("userPrincipalName") or data.get("displayName")}
+    except Exception:
+        pass
+    return {}
+
+
 SYSTEM_INSTRUCTION_TEMPLATE = """
 You are Devgent, an AI assistant running as a web app in the person's browser.
 Current date: {current_date}
@@ -316,6 +350,36 @@ Rules for using this:
    to have a good guess yet.
 4. Never claim you performed a connected-tool action you didn't actually emit an
    action for, and never claim a tool is connected when the status above says it isn't.
+5. GITHUB REPO FORMAT: repos are always addressed as "owner/repositoryname"
+   (e.g. "octocat/my-site" — never just "my-site" alone). If GitHub is CONNECTED and
+   the status line above shows a username, that IS the person's GitHub login — default
+   to it as the owner whenever they refer to "my repo"/"my repos" without naming an
+   owner. Still use whatever owner they explicitly give you (they may be working in
+   someone else's repo or an org's), and if you're ever unsure whose repo they mean,
+   ask rather than guessing.
+
+=== HOW CONNECTOR ACTION RESULTS COME BACK TO YOU (READ THIS CAREFULLY) ===
+When you emit a github_*/slack_*/notion_*/figma_*/ms365_* action, its result is NOT shown
+to the user. Instead, on your NEXT turn you receive it as a tool-result message and get to
+keep going — call another action if you need more information, or write your real,
+final, natural-language reply now that you have the data. You have a small budget of
+these round trips per user turn (roughly 3), so don't waste them (e.g. don't call
+github_list_repos then re-fetch the same file twice).
+
+This means: whenever the user asks you to DO something with a result — summarize a
+file, explain what changed in a PR, analyze a spreadsheet from SharePoint, describe a
+Figma file's structure, tell them what's in an issue — your job is to actually read
+the tool result you get back and produce that analysis yourself, in your own words.
+NEVER treat "call the read/list/search action" as the end of the task and stop there;
+that leaves the user with nothing, because raw tool output is not shown to them. If
+the user's request was itself just "show me the repos I can see" (i.e. the listing IS
+the whole ask), your final reply after getting the result should still be a normal
+written answer restating/formatting it — not silence, and not a second identical
+action call.
+Example: user says "summarize app.py in octocat/my-site" ->
+  turn 1: emit {{"action": "github_read_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "app.py"}}}}
+  turn 2 (you receive the file content back): write an actual 3-5 sentence summary of
+  what the code does — do not just repeat the file content or say "here's the file".
 
 === DYNAMIC MEMORY STORE (BE AGGRESSIVE ABOUT USING THIS) ===
 Current Stored Memories:
@@ -442,28 +506,37 @@ Note: when files reference each other (an .html that loads a sibling .js/.css fr
 {{"action": "suggest_connector", "action_data": {{"tool": "github", "reason": "so I can commit this straight to your repo"}}}}
 "tool" must be one of: github, slack, notion, figma, microsoft365.
 
-9. GitHub (only when connected)
+9. GitHub (only when connected) — repos are always "owner/repositoryname"
 {{"action": "github_list_repos", "action_data": {{}}}}
+{{"action": "github_get_repo", "action_data": {{"owner": "octocat", "repo": "my-site"}}}}
+{{"action": "github_list_branches", "action_data": {{"owner": "octocat", "repo": "my-site"}}}}
+{{"action": "github_create_repo", "action_data": {{"name": "new-repo", "description": "optional", "private": false}}}}
 {{"action": "github_list_files", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "src", "ref": "optional-branch-or-sha"}}}}
 {{"action": "github_read_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "src/app.py", "ref": "optional-branch-or-sha"}}}}
+{{"action": "github_search_code", "action_data": {{"owner": "octocat", "repo": "my-site", "query": "def handle_request"}}}}
 {{"action": "github_commit_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "src/app.py", "content": "print('hi')", "message": "Devgent: update app.py", "branch": "main"}}}}
 {{"action": "github_delete_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "old.py", "message": "Devgent: remove old.py", "branch": "main"}}}}
 {{"action": "github_create_branch", "action_data": {{"owner": "octocat", "repo": "my-site", "branch": "devgent-feature", "base": "main"}}}}
 {{"action": "github_list_pull_requests", "action_data": {{"owner": "octocat", "repo": "my-site", "state": "open"}}}}
+{{"action": "github_get_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "pr_number": 12}}}}
 {{"action": "github_create_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "title": "Add feature", "head": "devgent-feature", "base": "main", "body": "What changed and why."}}}}
 {{"action": "github_merge_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "pr_number": 12, "merge_method": "merge"}}}}
 {{"action": "github_close_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "pr_number": 12}}}}
 {{"action": "github_list_issues", "action_data": {{"owner": "octocat", "repo": "my-site", "state": "open"}}}}
+{{"action": "github_get_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "issue_number": 4}}}}
 {{"action": "github_create_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "title": "Bug: X breaks", "body": "Repro steps..."}}}}
 {{"action": "github_comment_on_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "issue_number": 4, "body": "Comment text"}}}}
 {{"action": "github_close_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "issue_number": 4}}}}
 
 10. Slack (only when connected)
 {{"action": "slack_list_channels", "action_data": {{}}}}
+{{"action": "slack_get_channel_info", "action_data": {{"channel": "C0123456"}}}}
+{{"action": "slack_list_users", "action_data": {{}}}}
 {{"action": "slack_read_channel_messages", "action_data": {{"channel": "C0123456", "limit": 20}}}}
 {{"action": "slack_send_message", "action_data": {{"channel": "#general", "text": "Message text"}}}}
 {{"action": "slack_reply_thread", "action_data": {{"channel": "#general", "thread_ts": "1699999999.000200", "text": "Reply text"}}}}
 {{"action": "slack_add_reaction", "action_data": {{"channel": "#general", "timestamp": "1699999999.000200", "emoji": "tada"}}}}
+{{"action": "slack_create_channel", "action_data": {{"name": "new-project", "is_private": false}}}}
 Note: slack_list_channels returns each channel's id — use that id (not the #name) for read/reply/react actions.
 
 11. Notion (only when connected)
@@ -472,18 +545,24 @@ Note: slack_list_channels returns each channel's id — use that id (not the #na
 {{"action": "notion_create_page", "action_data": {{"parent_page_id": "optional-id-from-a-prior-search", "title": "Meeting Notes", "paragraphs": ["First paragraph.", "Second paragraph."]}}}}
 {{"action": "notion_update_page", "action_data": {{"page_id": "id-from-a-prior-search", "paragraphs": ["New paragraph appended to the page."]}}}}
 {{"action": "notion_archive_page", "action_data": {{"page_id": "id-from-a-prior-search"}}}}
+{{"action": "notion_list_databases", "action_data": {{}}}}
+{{"action": "notion_query_database", "action_data": {{"database_id": "id-from-notion_list_databases", "filter": {{"optional": "raw Notion filter object"}}}}}}
 
 12. Figma (only when connected)
+{{"action": "figma_get_current_user", "action_data": {{}}}}
 {{"action": "figma_get_file", "action_data": {{"file_key": "abc123"}}}}
+{{"action": "figma_get_file_nodes", "action_data": {{"file_key": "abc123", "node_ids": ["1:2", "1:3"]}}}}
 {{"action": "figma_list_comments", "action_data": {{"file_key": "abc123"}}}}
 {{"action": "figma_add_comment", "action_data": {{"file_key": "abc123", "message": "Comment text", "node_id": "optional-1:2"}}}}
 {{"action": "figma_export_images", "action_data": {{"file_key": "abc123", "node_ids": ["1:2", "1:3"], "format": "png"}}}}
 The file_key is the id segment in a Figma file URL: figma.com/file/<file_key>/...
 
 13. Microsoft 365 (only when connected)
+{{"action": "ms365_get_my_profile", "action_data": {{}}}}
 {{"action": "ms365_recent_files", "action_data": {{}}}}
 {{"action": "ms365_search_files", "action_data": {{"query": "Q3 budget"}}}}
 {{"action": "ms365_read_file", "action_data": {{"item_id": "id-from-recent-or-search"}}}}
+{{"action": "ms365_list_sharepoint_sites", "action_data": {{"query": "optional keyword — omit for all sites"}}}}
 {{"action": "ms365_list_teams_channels", "action_data": {{"team_id": "optional — omit to list joined teams instead"}}}}
 {{"action": "ms365_teams_messages", "action_data": {{"team_id": "...", "channel_id": "..."}}}}
 {{"action": "ms365_send_teams_message", "action_data": {{"team_id": "...", "channel_id": "...", "text": "Message text"}}}}
@@ -497,9 +576,6 @@ chain one onto a broader request on your own initiative (e.g. don't close an iss
 opened a PR that references it, unless asked to).
 
 Remember to USE your memory as much as you can. You will remember absolutely nothing that you do not store in your memory.
-Furthermore, if the user asks you to look at a specific file in their Github repository, open the repository, then locate the file they asked you to look at, then open the file. Do not simply just check the repositories you can open, or just open the repository but not look at the specific file. Likewise, do not do similar stuff for Notion, Figma, Slack, or Microsoft 365
-If the user asks you to summarize a Github file, open the repository, open the file, READ IT, and do not RETURN the file, return the summary in the chat message.
-I have noticed that when I ask you to summarize a specific file in a specific repository, you never even open the repository - you just return a list of the repositories you can see. Don't do that.
 """
 
 
@@ -1154,6 +1230,56 @@ def do_github_close_issue(token, action_data, files_out):
     return f"Closed issue #{number} in {owner}/{repo}."
 
 
+def do_github_get_repo(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    r = github_api(token, "GET", f"/repos/{owner}/{repo}")
+    return (f"{owner}/{repo}: {r.get('description') or '(no description)'} — "
+            f"default branch `{r.get('default_branch')}`, {r.get('stargazers_count', 0)} stars, "
+            f"{r.get('open_issues_count', 0)} open issues, language: {r.get('language') or 'n/a'}, "
+            f"private: {r.get('private')}. {r.get('html_url', '')}")
+
+
+def do_github_list_branches(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    branches = github_api(token, "GET", f"/repos/{owner}/{repo}/branches?per_page=50")
+    names = ", ".join(b["name"] for b in branches) or "(none found)"
+    return f"Branches in {owner}/{repo}: {names}"
+
+
+def do_github_create_repo(token, action_data, files_out):
+    body = {"name": action_data["name"], "description": action_data.get("description", ""),
+            "private": bool(action_data.get("private", False))}
+    r = github_api(token, "POST", "/user/repos", json=body)
+    return f"Created repo {r.get('full_name', action_data['name'])}: {r.get('html_url', '')}"
+
+
+def do_github_search_code(token, action_data, files_out):
+    owner, repo, query = action_data["owner"], action_data["repo"], action_data["query"]
+    from urllib.parse import quote
+    q = quote(f"{query} repo:{owner}/{repo}")
+    r = github_api(token, "GET", f"/search/code?q={q}")
+    lines = [f"- {it['path']}" for it in r.get("items", [])[:10]]
+    return f"Code matches for \"{query}\" in {owner}/{repo}:\n" + ("\n".join(lines) if lines else "(none found)")
+
+
+def do_github_get_pull_request(token, action_data, files_out):
+    owner, repo, number = action_data["owner"], action_data["repo"], action_data["pr_number"]
+    r = github_api(token, "GET", f"/repos/{owner}/{repo}/pulls/{number}")
+    body_preview = (r.get("body") or "")[:1000]
+    return (f"PR #{number} in {owner}/{repo}: \"{r.get('title')}\" ({r.get('state')}), "
+            f"{r.get('head', {}).get('ref')} -> {r.get('base', {}).get('ref')}, "
+            f"+{r.get('additions', 0)}/-{r.get('deletions', 0)} across {r.get('changed_files', 0)} file(s), "
+            f"mergeable: {r.get('mergeable')}.\nDescription:\n{body_preview}")
+
+
+def do_github_get_issue(token, action_data, files_out):
+    owner, repo, number = action_data["owner"], action_data["repo"], action_data["issue_number"]
+    r = github_api(token, "GET", f"/repos/{owner}/{repo}/issues/{number}")
+    body_preview = (r.get("body") or "")[:1000]
+    return (f"Issue #{number} in {owner}/{repo}: \"{r.get('title')}\" ({r.get('state')}), "
+            f"{r.get('comments', 0)} comment(s).\nDescription:\n{body_preview}")
+
+
 def slack_api(token, method_name, **params):
     resp = requests.post(f"https://slack.com/api/{method_name}",
                           headers={"Authorization": f"Bearer {token}"}, json=params, timeout=30)
@@ -1191,6 +1317,29 @@ def do_slack_add_reaction(token, action_data, files_out):
     slack_api(token, "reactions.add", channel=action_data["channel"],
               timestamp=action_data["timestamp"], name=action_data.get("emoji", "thumbsup"))
     return f"Reacted with :{action_data.get('emoji', 'thumbsup')}: in {action_data['channel']}."
+
+
+def do_slack_list_users(token, action_data, files_out):
+    data = slack_api(token, "users.list", limit=100)
+    names = [f"{m.get('real_name') or m.get('name')} (id: {m['id']})"
+             for m in data.get("members", []) if not m.get("is_bot") and not m.get("deleted")]
+    return "People in this workspace:\n" + ("\n".join(f"- {n}" for n in names[:40]) if names else "(none found)")
+
+
+def do_slack_get_channel_info(token, action_data, files_out):
+    data = slack_api(token, "conversations.info", channel=action_data["channel"])
+    c = data.get("channel", {})
+    topic = (c.get("topic") or {}).get("value", "")
+    purpose = (c.get("purpose") or {}).get("value", "")
+    return (f"#{c.get('name')} — {c.get('num_members', '?')} members. "
+            f"Topic: {topic or '(none)'}. Purpose: {purpose or '(none)'}.")
+
+
+def do_slack_create_channel(token, action_data, files_out):
+    data = slack_api(token, "conversations.create", name=action_data["name"],
+                      is_private=bool(action_data.get("is_private", False)))
+    c = data.get("channel", {})
+    return f"Created channel #{c.get('name')} (id: {c.get('id')})."
 
 
 def notion_api(token, method, path, **kwargs):
@@ -1254,6 +1403,34 @@ def do_notion_archive_page(token, action_data, files_out):
     return f"Archived (deleted) Notion page {page_id}."
 
 
+def do_notion_list_databases(token, action_data, files_out):
+    data = notion_api(token, "POST", "/search", json={"filter": {"value": "database", "property": "object"}})
+    lines = []
+    for r in data.get("results", [])[:15]:
+        title_parts = r.get("title", []) or []
+        title = "".join(t.get("plain_text", "") for t in title_parts) or "(untitled)"
+        lines.append(f"- {title} (id: {r.get('id')})")
+    return "Notion databases found:\n" + ("\n".join(lines) if lines else "(none)")
+
+
+def do_notion_query_database(token, action_data, files_out):
+    database_id = action_data["database_id"]
+    body = {}
+    if action_data.get("filter"):
+        body["filter"] = action_data["filter"]
+    data = notion_api(token, "POST", f"/databases/{database_id}/query", json=body)
+    lines = []
+    for row in data.get("results", [])[:20]:
+        props = row.get("properties", {}) or {}
+        title = "(untitled)"
+        for p in props.values():
+            if p.get("type") == "title":
+                title = "".join(t.get("plain_text", "") for t in p.get("title", [])) or title
+                break
+        lines.append(f"- {title} (id: {row.get('id')})")
+    return f"Rows in database {database_id}:\n" + ("\n".join(lines) if lines else "(none)")
+
+
 def figma_api(token, method, path, **kwargs):
     resp = requests.request(method, f"https://api.figma.com/v1{path}",
                              headers={"Authorization": f"Bearer {token}"}, timeout=30, **kwargs)
@@ -1300,6 +1477,22 @@ def do_figma_export_images(token, action_data, files_out):
                                "data_base64": base64.b64encode(img_resp.content).decode()})
             count += 1
     return f"Exported {count} image(s) from Figma."
+
+
+def do_figma_get_current_user(token, action_data, files_out):
+    data = figma_api(token, "GET", "/me")
+    return f"Connected to Figma as {data.get('handle', '?')} ({data.get('email', '?')})."
+
+
+def do_figma_get_file_nodes(token, action_data, files_out):
+    ids = ",".join(action_data.get("node_ids", []))
+    data = figma_api(token, "GET", f"/files/{action_data['file_key']}/nodes?ids={ids}")
+    nodes = data.get("nodes", {}) or {}
+    lines = []
+    for node_id, wrapper in nodes.items():
+        doc = wrapper.get("document", {}) or {}
+        lines.append(f"- {node_id}: {doc.get('name', '?')} ({doc.get('type', '?')})")
+    return f"Nodes in {action_data['file_key']}:\n" + ("\n".join(lines) if lines else "(none found)")
 
 
 def ms_graph_api(token, method, path, **kwargs):
@@ -1374,6 +1567,21 @@ def do_ms365_send_teams_message(token, action_data, files_out):
     return f"Posted a message to the Teams channel."
 
 
+def do_ms365_get_my_profile(token, action_data, files_out):
+    data = ms_graph_api(token, "GET", "/me")
+    return (f"Connected to Microsoft 365 as {data.get('displayName', '?')} "
+            f"({data.get('mail') or data.get('userPrincipalName', '?')}), {data.get('jobTitle') or 'no title set'}.")
+
+
+def do_ms365_list_sharepoint_sites(token, action_data, files_out):
+    from urllib.parse import quote
+    q = quote(action_data.get("query", "*"))
+    data = ms_graph_api(token, "GET", f"/sites?search={q}")
+    lines = [f"- {s.get('displayName', s.get('name', '?'))} (id: {s.get('id')}) {s.get('webUrl', '')}"
+             for s in data.get("value", [])[:15]]
+    return "SharePoint sites found:\n" + ("\n".join(lines) if lines else "(none found)")
+
+
 # Registry: action name -> (which CONNECTORS key it needs, handler(token, action_data, files_out) -> str)
 CONNECTOR_ACTIONS = {
     "github_list_repos": ("github", do_github_list_repos),
@@ -1390,23 +1598,36 @@ CONNECTOR_ACTIONS = {
     "github_create_issue": ("github", do_github_create_issue),
     "github_comment_on_issue": ("github", do_github_comment_on_issue),
     "github_close_issue": ("github", do_github_close_issue),
+    "github_get_repo": ("github", do_github_get_repo),
+    "github_list_branches": ("github", do_github_list_branches),
+    "github_create_repo": ("github", do_github_create_repo),
+    "github_search_code": ("github", do_github_search_code),
+    "github_get_pull_request": ("github", do_github_get_pull_request),
+    "github_get_issue": ("github", do_github_get_issue),
 
     "slack_list_channels": ("slack", do_slack_list_channels),
     "slack_read_channel_messages": ("slack", do_slack_read_channel_messages),
     "slack_send_message": ("slack", do_slack_send_message),
     "slack_reply_thread": ("slack", do_slack_reply_thread),
     "slack_add_reaction": ("slack", do_slack_add_reaction),
+    "slack_list_users": ("slack", do_slack_list_users),
+    "slack_get_channel_info": ("slack", do_slack_get_channel_info),
+    "slack_create_channel": ("slack", do_slack_create_channel),
 
     "notion_search": ("notion", do_notion_search),
     "notion_read_page": ("notion", do_notion_read_page),
     "notion_create_page": ("notion", do_notion_create_page),
     "notion_update_page": ("notion", do_notion_update_page),
     "notion_archive_page": ("notion", do_notion_archive_page),
+    "notion_list_databases": ("notion", do_notion_list_databases),
+    "notion_query_database": ("notion", do_notion_query_database),
 
     "figma_get_file": ("figma", do_figma_get_file),
     "figma_list_comments": ("figma", do_figma_list_comments),
     "figma_add_comment": ("figma", do_figma_add_comment),
     "figma_export_images": ("figma", do_figma_export_images),
+    "figma_get_current_user": ("figma", do_figma_get_current_user),
+    "figma_get_file_nodes": ("figma", do_figma_get_file_nodes),
 
     "ms365_recent_files": ("microsoft365", do_ms365_recent_files),
     "ms365_search_files": ("microsoft365", do_ms365_search_files),
@@ -1414,6 +1635,8 @@ CONNECTOR_ACTIONS = {
     "ms365_list_teams_channels": ("microsoft365", do_ms365_list_teams_channels),
     "ms365_teams_messages": ("microsoft365", do_ms365_teams_messages),
     "ms365_send_teams_message": ("microsoft365", do_ms365_send_teams_message),
+    "ms365_get_my_profile": ("microsoft365", do_ms365_get_my_profile),
+    "ms365_list_sharepoint_sites": ("microsoft365", do_ms365_list_sharepoint_sites),
 }
 
 
@@ -1423,8 +1646,10 @@ CONNECTOR_ACTIONS = {
 
 def execute_actions(actions, memory, connections=None):
     files = []
-    system_notes = []
+    other_notes = []       # shown to the user directly (policy notices, unknown actions)
+    connector_notes = []   # fed back to the model as tool results — NOT shown to the user directly
     connector_suggestions = []
+    had_connector_call = False
 
     for item in actions:
         action_type = item.get("action")
@@ -1480,7 +1705,7 @@ def execute_actions(actions, memory, connections=None):
                                   "group": zip_name})
 
             elif action_type in ("run_command", "start_dev_server"):
-                system_notes.append(
+                other_notes.append(
                     f"⚠️ The `{action_type}` action isn't available in the web version for security reasons "
                     f"(a public server can't safely run arbitrary commands). Download the Devgent desktop app "
                     f"for terminal and dev-server support."
@@ -1492,17 +1717,22 @@ def execute_actions(actions, memory, connections=None):
                     connector_suggestions.append({"tool": tool, "reason": action_data.get("reason", "")})
 
             elif action_type in CONNECTOR_ACTIONS:
+                had_connector_call = True
                 tool, handler_fn = CONNECTOR_ACTIONS[action_type]
                 token = _connector_token(connections, tool)
-                system_notes.append(f"🔗 {handler_fn(token, action_data, files)}")
+                connector_notes.append(f"[{action_type} result] {handler_fn(token, action_data, files)}")
 
             else:
-                system_notes.append(f"⚠️ Unknown action `{action_type}` — ignored.")
+                other_notes.append(f"⚠️ Unknown action `{action_type}` — ignored.")
 
         except Exception as e:
-            system_notes.append(f"❌ Failed to complete `{action_type}`: {e}")
+            if action_type in CONNECTOR_ACTIONS:
+                had_connector_call = True
+                connector_notes.append(f"[{action_type} ERROR] {e}")
+            else:
+                other_notes.append(f"❌ Failed to complete `{action_type}`: {e}")
 
-    return files, memory, system_notes, connector_suggestions
+    return files, memory, connector_notes, other_notes, connector_suggestions, had_connector_call
 
 
 # =============================================================================
@@ -1558,10 +1788,11 @@ class handler(BaseHTTPRequestHandler):
                 if q.get("error"):
                     raise RuntimeError(q.get("error_description", q["error"]))
                 payload = oauth_exchange_code(tool, q.get("code", ""), base_url)
+                identity = fetch_identity(tool, payload.get("access_token"), payload)
                 message = {"devgent_oauth": True, "ok": True, "tool": tool,
-                           "access_token": payload.get("access_token"),
-                           "team": (payload.get("team") or {}).get("name") if tool == "slack" else None}
-                body_note = f"Connected {CONNECTORS[tool]['label']} — you can close this tab."
+                           "access_token": payload.get("access_token"), **identity}
+                who_note = f" as {identity['username']}" if identity.get("username") else ""
+                body_note = f"Connected {CONNECTORS[tool]['label']}{who_note} — you can close this tab."
             except Exception as e:
                 message = {"devgent_oauth": True, "ok": False, "tool": tool, "error": str(e)}
                 body_note = f"Couldn't connect {CONNECTORS[tool]['label']}: {e}"
@@ -1629,10 +1860,13 @@ display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
 
             memory_str = json.dumps(memory, indent=2) if memory else "No stored memories yet."
             connected = connected_tools(connections)
-            connectors_lines = [
-                f"- {cfg['label']} ({key}): {'CONNECTED' if key in connected else 'not connected'}"
-                for key, cfg in CONNECTORS.items()
-            ]
+            connectors_lines = []
+            for key, cfg in CONNECTORS.items():
+                if key in connected:
+                    who = ((connections.get(key) or {}).get("username") or "").strip()
+                    connectors_lines.append(f"- {cfg['label']} ({key}): CONNECTED" + (f" as {who}" if who else ""))
+                else:
+                    connectors_lines.append(f"- {cfg['label']} ({key}): not connected")
             sys_inst = SYSTEM_INSTRUCTION_TEMPLATE.format(
                 current_date=date.today().isoformat(),
                 memory_state=memory_str,
@@ -1642,26 +1876,68 @@ display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
             response_text = call_gemini(api_key, model, sys_inst, history, full_prompt)
             response_text = re.sub(r'<think>[\s\S]*?</think>', '', response_text, flags=re.IGNORECASE).strip()
 
-            # Pull the trailing ```json ... ``` action block out of the reply, same approach as the desktop app.
-            json_match = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", response_text)
-            reply_text = response_text
-            actions = []
-            if json_match:
-                reply_text = response_text[:json_match.start()].strip()
-                try:
-                    parsed = json.loads(json_match.group(1))
-                    actions = parsed.get("actions", [])
-                except Exception:
-                    pass
+            # --- Agent loop -------------------------------------------------------------
+            # A connector action's result is a TOOL result, not a chat message: the model
+            # gets it fed back as a synthetic turn and must write the actual reply itself
+            # (summarize/explain/decide-what's-next), instead of the raw API output being
+            # dumped straight into the chat. We give it up to MAX_AGENT_STEPS-1 additional
+            # round trips to gather everything it needs before it has to produce a final,
+            # connector-call-free reply. NOTE: each round trip is a full Gemini call, so on
+            # Vercel's default 10s hobby-tier function timeout this can run out of time on a
+            # long chain — bump `maxDuration` in vercel.json (e.g. 60) if you hit that.
+            MAX_AGENT_STEPS = 4
+            agent_history = list(history)
+            next_user_message = full_prompt
+            all_files, all_suggestions, all_other_notes = [], [], []
+            reply_text, last_connector_block = "", ""
 
-            files, memory, system_notes, connector_suggestions = (
-                execute_actions(actions, memory, connections) if actions else ([], memory, [], [])
-            )
-            if system_notes:
-                reply_text = (reply_text + "\n\n" + "\n".join(system_notes)).strip()
+            for step in range(MAX_AGENT_STEPS):
+                json_match = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", response_text)
+                step_reply = response_text
+                actions = []
+                if json_match:
+                    step_reply = response_text[:json_match.start()].strip()
+                    try:
+                        actions = json.loads(json_match.group(1)).get("actions", [])
+                    except Exception:
+                        pass
 
-            self._respond(200, {"reply": reply_text, "files": files, "memory": memory,
-                                 "connector_suggestions": connector_suggestions, "connectors": connected})
+                files, memory, connector_notes, other_notes, suggestions, had_connector_call = (
+                    execute_actions(actions, memory, connections) if actions else ([], memory, [], [], [], False)
+                )
+                all_files += files
+                all_suggestions += suggestions
+                all_other_notes += other_notes
+
+                if not had_connector_call:
+                    reply_text = step_reply
+                    break
+
+                last_connector_block = "\n".join(connector_notes) if connector_notes else "(no output)"
+                if step == MAX_AGENT_STEPS - 1:
+                    # Ran out of steps mid-chain — hand back what we have instead of nothing.
+                    reply_text = (step_reply + "\n\n" if step_reply else "") + (
+                        "I gathered this before running out of steps for this turn — you can ask me to continue:\n\n"
+                        + last_connector_block
+                    )
+                    break
+
+                agent_history.append({"role": "user", "content": next_user_message})
+                agent_history.append({"role": "model", "content": response_text})
+                next_user_message = (
+                    "[Tool result — the user has NOT seen this yet. Use it to write your actual reply now: "
+                    "directly answer what was asked (summarize, explain, confirm, etc. in your own words), or "
+                    "if you still need another action first, include another ```json actions block. Never just "
+                    "paste this raw output back verbatim as your whole reply.]\n\n" + last_connector_block
+                )
+                response_text = call_gemini(api_key, model, sys_inst, agent_history, next_user_message)
+                response_text = re.sub(r'<think>[\s\S]*?</think>', '', response_text, flags=re.IGNORECASE).strip()
+
+            if all_other_notes:
+                reply_text = (reply_text + "\n\n" + "\n".join(all_other_notes)).strip()
+
+            self._respond(200, {"reply": reply_text, "files": all_files, "memory": memory,
+                                 "connector_suggestions": all_suggestions, "connectors": connected})
 
         except Exception as e:
             traceback.print_exc()
