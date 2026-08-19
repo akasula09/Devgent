@@ -498,6 +498,8 @@ opened a PR that references it, unless asked to).
 
 Remember to USE your memory as much as you can. You will remember absolutely nothing that you do not store in your memory.
 Furthermore, if the user asks you to look at a specific file in their Github repository, open the repository, then locate the file they asked you to look at, then open the file. Do not simply just check the repositories you can open, or just open the repository but not look at the specific file. Likewise, do not do similar stuff for Notion, Figma, Slack, or Microsoft 365
+If the user asks you to summarize a Github file, open the repository, open the file, READ IT, and do not RETURN the file, return the summary in the chat message.
+I have noticed that when I ask you to summarize a specific file in a specific repository, you never even open the repository - you just return a list of the repositories you can see. Don't do that.
 """
 
 
