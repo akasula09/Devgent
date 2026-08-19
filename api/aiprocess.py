@@ -497,6 +497,7 @@ chain one onto a broader request on your own initiative (e.g. don't close an iss
 opened a PR that references it, unless asked to).
 
 Remember to USE your memory as much as you can. You will remember absolutely nothing that you do not store in your memory.
+Furthermore, if the user asks you to look at a specific file in their Github repository, open the repository, then locate the file they asked you to look at, then open the file. Do not simply just check the repositories you can open, or just open the repository but not look at the specific file. Likewise, do not do similar stuff for Notion, Figma, Slack, or Microsoft 365
 """
 
 
