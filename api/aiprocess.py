@@ -120,14 +120,16 @@ CONNECTORS = {
             "2. Homepage URL: your deployed site's URL. Authorization callback URL: "
             "<your-site>/api/aiprocess.py?oauth_callback=github\n"
             "3. Free, no approval wait. Copy the Client ID, then click \"Generate a new client secret\" and copy that too.\n"
-            "4. Set env vars GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Vercel to those two values."
+            "4. Set env vars GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Vercel to those two values.\n"
+            "5. The `repo` scope already requested covers reading/committing/deleting files, branches, pull "
+            "requests, and issues — no extra setup needed for those finer-grained actions."
         ),
     },
     "slack": {
         "label": "Slack",
         "authorize_url": "https://slack.com/oauth/v2/authorize",
         "token_url": "https://slack.com/api/oauth.v2.access",
-        "scope": "chat:write channels:read channels:history",
+        "scope": "chat:write channels:read channels:history groups:history reactions:write",
         "user_scope": "",
         "client_id_env": "SLACK_CLIENT_ID",
         "client_secret_env": "SLACK_CLIENT_SECRET",
@@ -135,7 +137,8 @@ CONNECTORS = {
         "setup_help": (
             "1. Go to https://api.slack.com/apps -> \"Create New App\" -> \"From scratch\" (free, any Slack account).\n"
             "2. Under \"OAuth & Permissions\", add redirect URL: <your-site>/api/aiprocess.py?oauth_callback=slack\n"
-            "3. Under \"Bot Token Scopes\" add: chat:write, channels:read, channels:history.\n"
+            "3. Under \"Bot Token Scopes\" add: chat:write, channels:read, channels:history, groups:history, reactions:write "
+            "(groups:history is needed to read private-channel messages; skip it if you only need public channels).\n"
             "4. Under \"Basic Information\" copy the Client ID and Client Secret.\n"
             "5. Set env vars SLACK_CLIENT_ID and SLACK_CLIENT_SECRET in Vercel."
         ),
@@ -153,15 +156,18 @@ CONNECTORS = {
             "1. Go to https://www.notion.so/my-integrations -> \"New integration\".\n"
             "2. Set type to \"Public\" (this is what lets ANY Notion user connect, not just your own workspace).\n"
             "3. Redirect URI: <your-site>/api/aiprocess.py?oauth_callback=notion\n"
-            "4. Free. Copy the OAuth client ID and client secret from the integration's \"Distribution\" tab.\n"
-            "5. Set env vars NOTION_CLIENT_ID and NOTION_CLIENT_SECRET in Vercel."
+            "4. Under \"Capabilities\" enable Read content, Update content, and Insert content — without these, "
+            "notion_read_page / notion_update_page / notion_create_page / notion_archive_page will fail even "
+            "though the OAuth connection itself succeeds.\n"
+            "5. Free. Copy the OAuth client ID and client secret from the integration's \"Distribution\" tab.\n"
+            "6. Set env vars NOTION_CLIENT_ID and NOTION_CLIENT_SECRET in Vercel."
         ),
     },
     "figma": {
         "label": "Figma",
         "authorize_url": "https://www.figma.com/oauth",
         "token_url": "https://api.figma.com/v1/oauth/token",
-        "scope": "file_read",
+        "scope": "files:read file_comments:write",
         "client_id_env": "FIGMA_CLIENT_ID",
         "client_secret_env": "FIGMA_CLIENT_SECRET",
         "auth_style": "form",
@@ -169,14 +175,17 @@ CONNECTORS = {
             "1. Go to https://www.figma.com/developers/apps -> \"Create new app\" (free).\n"
             "2. Callback URL: <your-site>/api/aiprocess.py?oauth_callback=figma\n"
             "3. Copy the Client ID and Client secret.\n"
-            "4. Set env vars FIGMA_CLIENT_ID and FIGMA_CLIENT_SECRET in Vercel."
+            "4. Set env vars FIGMA_CLIENT_ID and FIGMA_CLIENT_SECRET in Vercel.\n"
+            "5. Figma's OAuth scope names occasionally change on their end (\"files:read\" vs older \"file_read\") — "
+            "if figma_get_file/figma_export_images 401s, check the exact scope name Figma's dev portal shows for "
+            "your app and update the `scope` value in CONNECTORS[\"figma\"] to match."
         ),
     },
     "microsoft365": {
         "label": "Microsoft 365",
         "authorize_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
         "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-        "scope": "offline_access Files.Read.All Sites.Read.All ChannelMessage.Read.All User.Read",
+        "scope": "offline_access Files.Read.All Sites.Read.All ChannelMessage.Read.All ChannelMessage.Send User.Read",
         "client_id_env": "MS365_CLIENT_ID",
         "client_secret_env": "MS365_CLIENT_SECRET",
         "auth_style": "form",
@@ -188,8 +197,9 @@ CONNECTORS = {
             "3. Redirect URI (platform: Web): <your-site>/api/aiprocess.py?oauth_callback=microsoft365\n"
             "4. Under \"Certificates & secrets\" create a new client secret and copy its VALUE (not the ID).\n"
             "5. Under \"API permissions\" add the delegated Microsoft Graph permissions listed in \"scope\" above.\n"
-            "   Files/Sites/User read scopes work immediately; ChannelMessage.Read.All may prompt an admin consent "
-            "screen for work/school accounts — personal accounts and SharePoint/OneDrive access work without it.\n"
+            "   Files/Sites/User read scopes work immediately; ChannelMessage.Read.All and ChannelMessage.Send may "
+            "prompt an admin-consent screen for work/school accounts — personal accounts and SharePoint/OneDrive "
+            "access (recent files, search, reading a file's contents) work without it.\n"
             "6. Set env vars MS365_CLIENT_ID and MS365_CLIENT_SECRET in Vercel."
         ),
     },
@@ -432,28 +442,59 @@ Note: when files reference each other (an .html that loads a sibling .js/.css fr
 {{"action": "suggest_connector", "action_data": {{"tool": "github", "reason": "so I can commit this straight to your repo"}}}}
 "tool" must be one of: github, slack, notion, figma, microsoft365.
 
-9. GitHub (only when connected) — list repos, or create/update a file (auto-commits; creates the repo file if it doesn't exist, updates it if it does)
+9. GitHub (only when connected)
 {{"action": "github_list_repos", "action_data": {{}}}}
+{{"action": "github_list_files", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "src", "ref": "optional-branch-or-sha"}}}}
+{{"action": "github_read_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "src/app.py", "ref": "optional-branch-or-sha"}}}}
 {{"action": "github_commit_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "src/app.py", "content": "print('hi')", "message": "Devgent: update app.py", "branch": "main"}}}}
+{{"action": "github_delete_file", "action_data": {{"owner": "octocat", "repo": "my-site", "path": "old.py", "message": "Devgent: remove old.py", "branch": "main"}}}}
+{{"action": "github_create_branch", "action_data": {{"owner": "octocat", "repo": "my-site", "branch": "devgent-feature", "base": "main"}}}}
+{{"action": "github_list_pull_requests", "action_data": {{"owner": "octocat", "repo": "my-site", "state": "open"}}}}
+{{"action": "github_create_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "title": "Add feature", "head": "devgent-feature", "base": "main", "body": "What changed and why."}}}}
+{{"action": "github_merge_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "pr_number": 12, "merge_method": "merge"}}}}
+{{"action": "github_close_pull_request", "action_data": {{"owner": "octocat", "repo": "my-site", "pr_number": 12}}}}
+{{"action": "github_list_issues", "action_data": {{"owner": "octocat", "repo": "my-site", "state": "open"}}}}
+{{"action": "github_create_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "title": "Bug: X breaks", "body": "Repro steps..."}}}}
+{{"action": "github_comment_on_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "issue_number": 4, "body": "Comment text"}}}}
+{{"action": "github_close_issue", "action_data": {{"owner": "octocat", "repo": "my-site", "issue_number": 4}}}}
 
-10. Slack (only when connected) — list channels, or send a message
+10. Slack (only when connected)
 {{"action": "slack_list_channels", "action_data": {{}}}}
+{{"action": "slack_read_channel_messages", "action_data": {{"channel": "C0123456", "limit": 20}}}}
 {{"action": "slack_send_message", "action_data": {{"channel": "#general", "text": "Message text"}}}}
+{{"action": "slack_reply_thread", "action_data": {{"channel": "#general", "thread_ts": "1699999999.000200", "text": "Reply text"}}}}
+{{"action": "slack_add_reaction", "action_data": {{"channel": "#general", "timestamp": "1699999999.000200", "emoji": "tada"}}}}
+Note: slack_list_channels returns each channel's id — use that id (not the #name) for read/reply/react actions.
 
-11. Notion (only when connected) — search existing pages, or create a new page under one (title only needed when creating from the workspace root)
+11. Notion (only when connected)
 {{"action": "notion_search", "action_data": {{"query": "roadmap"}}}}
+{{"action": "notion_read_page", "action_data": {{"page_id": "id-from-a-prior-search"}}}}
 {{"action": "notion_create_page", "action_data": {{"parent_page_id": "optional-id-from-a-prior-search", "title": "Meeting Notes", "paragraphs": ["First paragraph.", "Second paragraph."]}}}}
+{{"action": "notion_update_page", "action_data": {{"page_id": "id-from-a-prior-search", "paragraphs": ["New paragraph appended to the page."]}}}}
+{{"action": "notion_archive_page", "action_data": {{"page_id": "id-from-a-prior-search"}}}}
 
-12. Figma (only when connected) — pull file structure/context, or export frames as PNGs (returned to the user as downloadable/previewable image files)
+12. Figma (only when connected)
 {{"action": "figma_get_file", "action_data": {{"file_key": "abc123"}}}}
+{{"action": "figma_list_comments", "action_data": {{"file_key": "abc123"}}}}
+{{"action": "figma_add_comment", "action_data": {{"file_key": "abc123", "message": "Comment text", "node_id": "optional-1:2"}}}}
 {{"action": "figma_export_images", "action_data": {{"file_key": "abc123", "node_ids": ["1:2", "1:3"], "format": "png"}}}}
 The file_key is the id segment in a Figma file URL: figma.com/file/<file_key>/...
 
-13. Microsoft 365 (only when connected) — recent OneDrive/SharePoint files, a keyword search across them, or recent Teams channel messages
+13. Microsoft 365 (only when connected)
 {{"action": "ms365_recent_files", "action_data": {{}}}}
 {{"action": "ms365_search_files", "action_data": {{"query": "Q3 budget"}}}}
+{{"action": "ms365_read_file", "action_data": {{"item_id": "id-from-recent-or-search"}}}}
+{{"action": "ms365_list_teams_channels", "action_data": {{"team_id": "optional — omit to list joined teams instead"}}}}
 {{"action": "ms365_teams_messages", "action_data": {{"team_id": "...", "channel_id": "..."}}}}
-(Use ms365_recent_files or ms365_search_files first if you don't already have a team_id/channel_id in memory or history.)
+{{"action": "ms365_send_teams_message", "action_data": {{"team_id": "...", "channel_id": "...", "text": "Message text"}}}}
+(Use ms365_recent_files/search_files or ms365_list_teams_channels first if you don't already have an item_id/team_id/channel_id in memory or history.)
+
+=== CAUTION WITH HARD-TO-UNDO CONNECTOR ACTIONS ===
+merge_pull_request, close_pull_request, delete_file, close_issue, and notion_archive_page change or
+remove something real for the person and are not easily reversible from here. Only take one of these
+when the user's message unambiguously asks for exactly that action on that specific target — never
+chain one onto a broader request on your own initiative (e.g. don't close an issue just because you
+opened a PR that references it, unless asked to).
 
 Remember to USE your memory as much as you can. You will remember absolutely nothing that you do not store in your memory.
 """
@@ -983,13 +1024,39 @@ def github_api(token, method, path, **kwargs):
     return resp.json() if resp.text else {}
 
 
-def do_github_list_repos(token, action_data):
+def do_github_list_repos(token, action_data, files_out):
     repos = github_api(token, "GET", "/user/repos?per_page=20&sort=updated")
     names = ", ".join(r["full_name"] for r in repos[:20]) or "(no repos found)"
     return f"Repos I can see: {names}"
 
 
-def do_github_commit_file(token, action_data):
+def do_github_list_files(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    path = action_data.get("path", "")
+    ref_q = f"?ref={action_data['ref']}" if action_data.get("ref") else ""
+    items = github_api(token, "GET", f"/repos/{owner}/{repo}/contents/{path}{ref_q}")
+    if isinstance(items, dict):  # a single file path was given, not a directory
+        return f"`{path}` is a file, not a directory — use github_read_file to read it."
+    lines = [f"- {it['path']}{'/' if it['type'] == 'dir' else ''}" for it in items]
+    return f"Contents of {owner}/{repo}/{path or '(root)'}:\n" + ("\n".join(lines) if lines else "(empty)")
+
+
+def do_github_read_file(token, action_data, files_out):
+    owner, repo, path = action_data["owner"], action_data["repo"], action_data["path"]
+    ref_q = f"?ref={action_data['ref']}" if action_data.get("ref") else ""
+    result = github_api(token, "GET", f"/repos/{owner}/{repo}/contents/{path}{ref_q}")
+    raw = base64.b64decode(result.get("content", "").replace("\n", ""))
+    try:
+        text = raw.decode("utf-8")
+        files_out.append({"filename": safe_filename(os.path.basename(path), ""), "mimetype": "text/plain",
+                           "data_base64": base64.b64encode(raw).decode()})
+        preview = text if len(text) <= 4000 else text[:4000] + "\n...[truncated — full file attached below]"
+        return f"Read `{path}` from {owner}/{repo} ({len(raw)} bytes):\n```\n{preview}\n```"
+    except UnicodeDecodeError:
+        return f"`{path}` in {owner}/{repo} isn't readable as text ({len(raw)} bytes, binary file)."
+
+
+def do_github_commit_file(token, action_data, files_out):
     owner, repo, path = action_data["owner"], action_data["repo"], action_data["path"]
     content_b64 = base64.b64encode(action_data.get("content", "").encode("utf-8")).decode()
     sha = None
@@ -1007,6 +1074,83 @@ def do_github_commit_file(token, action_data):
     return f"Committed `{path}` to {owner}/{repo}. {html_url}"
 
 
+def do_github_delete_file(token, action_data, files_out):
+    owner, repo, path = action_data["owner"], action_data["repo"], action_data["path"]
+    existing = github_api(token, "GET", f"/repos/{owner}/{repo}/contents/{path}")
+    body = {"message": action_data.get("message", f"Devgent: delete {path}"),
+            "sha": existing["sha"], "branch": action_data.get("branch", "main")}
+    github_api(token, "DELETE", f"/repos/{owner}/{repo}/contents/{path}", json=body)
+    return f"Deleted `{path}` from {owner}/{repo}."
+
+
+def do_github_create_branch(token, action_data, files_out):
+    owner, repo, branch = action_data["owner"], action_data["repo"], action_data["branch"]
+    base = action_data.get("base", "main")
+    base_ref = github_api(token, "GET", f"/repos/{owner}/{repo}/git/ref/heads/{base}")
+    sha = base_ref["object"]["sha"]
+    github_api(token, "POST", f"/repos/{owner}/{repo}/git/refs",
+               json={"ref": f"refs/heads/{branch}", "sha": sha})
+    return f"Created branch `{branch}` from `{base}` in {owner}/{repo}."
+
+
+def do_github_list_pull_requests(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    state = action_data.get("state", "open")
+    prs = github_api(token, "GET", f"/repos/{owner}/{repo}/pulls?state={state}")
+    lines = [f"- #{p['number']} {p['title']} ({p['head']['ref']} -> {p['base']['ref']})" for p in prs[:20]]
+    return f"{state.capitalize()} pull requests in {owner}/{repo}:\n" + ("\n".join(lines) if lines else "(none)")
+
+
+def do_github_create_pull_request(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    body = {"title": action_data["title"], "head": action_data["head"], "base": action_data["base"],
+            "body": action_data.get("body", "")}
+    result = github_api(token, "POST", f"/repos/{owner}/{repo}/pulls", json=body)
+    return f"Opened PR #{result['number']} in {owner}/{repo}: {result.get('html_url', '')}"
+
+
+def do_github_merge_pull_request(token, action_data, files_out):
+    owner, repo, number = action_data["owner"], action_data["repo"], action_data["pr_number"]
+    body = {"merge_method": action_data.get("merge_method", "merge")}
+    github_api(token, "PUT", f"/repos/{owner}/{repo}/pulls/{number}/merge", json=body)
+    return f"Merged PR #{number} in {owner}/{repo}."
+
+
+def do_github_close_pull_request(token, action_data, files_out):
+    owner, repo, number = action_data["owner"], action_data["repo"], action_data["pr_number"]
+    github_api(token, "PATCH", f"/repos/{owner}/{repo}/pulls/{number}", json={"state": "closed"})
+    return f"Closed PR #{number} in {owner}/{repo} (not merged)."
+
+
+def do_github_list_issues(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    state = action_data.get("state", "open")
+    issues = github_api(token, "GET", f"/repos/{owner}/{repo}/issues?state={state}")
+    issues = [i for i in issues if "pull_request" not in i]
+    lines = [f"- #{i['number']} {i['title']}" for i in issues[:20]]
+    return f"{state.capitalize()} issues in {owner}/{repo}:\n" + ("\n".join(lines) if lines else "(none)")
+
+
+def do_github_create_issue(token, action_data, files_out):
+    owner, repo = action_data["owner"], action_data["repo"]
+    body = {"title": action_data["title"], "body": action_data.get("body", "")}
+    result = github_api(token, "POST", f"/repos/{owner}/{repo}/issues", json=body)
+    return f"Opened issue #{result['number']} in {owner}/{repo}: {result.get('html_url', '')}"
+
+
+def do_github_comment_on_issue(token, action_data, files_out):
+    owner, repo, number = action_data["owner"], action_data["repo"], action_data["issue_number"]
+    github_api(token, "POST", f"/repos/{owner}/{repo}/issues/{number}/comments",
+               json={"body": action_data.get("body", "")})
+    return f"Commented on issue #{number} in {owner}/{repo}."
+
+
+def do_github_close_issue(token, action_data, files_out):
+    owner, repo, number = action_data["owner"], action_data["repo"], action_data["issue_number"]
+    github_api(token, "PATCH", f"/repos/{owner}/{repo}/issues/{number}", json={"state": "closed"})
+    return f"Closed issue #{number} in {owner}/{repo}."
+
+
 def slack_api(token, method_name, **params):
     resp = requests.post(f"https://slack.com/api/{method_name}",
                           headers={"Authorization": f"Bearer {token}"}, json=params, timeout=30)
@@ -1016,15 +1160,34 @@ def slack_api(token, method_name, **params):
     return data
 
 
-def do_slack_list_channels(token, action_data):
+def do_slack_list_channels(token, action_data, files_out):
     data = slack_api(token, "conversations.list", limit=50, types="public_channel,private_channel")
     names = ", ".join("#" + c["name"] for c in data.get("channels", [])[:30]) or "(no channels found)"
     return f"Channels I can see: {names}"
 
 
-def do_slack_send_message(token, action_data):
+def do_slack_read_channel_messages(token, action_data, files_out):
+    data = slack_api(token, "conversations.history", channel=action_data["channel"],
+                      limit=action_data.get("limit", 20))
+    lines = [f"- {m.get('user', 'someone')}: {m.get('text', '')[:200]}" for m in data.get("messages", [])]
+    return f"Recent messages in {action_data['channel']}:\n" + ("\n".join(lines) if lines else "(none)")
+
+
+def do_slack_send_message(token, action_data, files_out):
     data = slack_api(token, "chat.postMessage", channel=action_data["channel"], text=action_data.get("text", ""))
     return f"Sent to {data.get('channel', action_data['channel'])} in Slack."
+
+
+def do_slack_reply_thread(token, action_data, files_out):
+    data = slack_api(token, "chat.postMessage", channel=action_data["channel"],
+                      thread_ts=action_data["thread_ts"], text=action_data.get("text", ""))
+    return f"Replied in thread on {data.get('channel', action_data['channel'])}."
+
+
+def do_slack_add_reaction(token, action_data, files_out):
+    slack_api(token, "reactions.add", channel=action_data["channel"],
+              timestamp=action_data["timestamp"], name=action_data.get("emoji", "thumbsup"))
+    return f"Reacted with :{action_data.get('emoji', 'thumbsup')}: in {action_data['channel']}."
 
 
 def notion_api(token, method, path, **kwargs):
@@ -1035,7 +1198,7 @@ def notion_api(token, method, path, **kwargs):
     return resp.json()
 
 
-def do_notion_search(token, action_data):
+def do_notion_search(token, action_data, files_out):
     data = notion_api(token, "POST", "/search", json={"query": action_data.get("query", "")})
     results = data.get("results", [])[:10]
     lines = []
@@ -1046,7 +1209,30 @@ def do_notion_search(token, action_data):
     return "Notion pages found:\n" + ("\n".join(lines) if lines else "(none)")
 
 
-def do_notion_create_page(token, action_data):
+def do_notion_read_page(token, action_data, files_out):
+    page_id = action_data["page_id"]
+    blocks = notion_api(token, "GET", f"/blocks/{page_id}/children?page_size=50")
+    lines = []
+    for b in blocks.get("results", []):
+        btype = b.get("type", "")
+        rich_text = (b.get(btype, {}) or {}).get("rich_text", [])
+        text = "".join(t.get("plain_text", "") for t in rich_text)
+        if text:
+            lines.append(text)
+    content = "\n".join(lines) or "(no readable text content)"
+    return f"Content of Notion page {page_id}:\n{content[:4000]}"
+
+
+def do_notion_update_page(token, action_data, files_out):
+    page_id = action_data["page_id"]
+    children = [{"object": "block", "type": "paragraph",
+                 "paragraph": {"rich_text": [{"type": "text", "text": {"content": p}}]}}
+                for p in action_data.get("paragraphs", [])]
+    notion_api(token, "PATCH", f"/blocks/{page_id}/children", json={"children": children})
+    return f"Appended {len(children)} paragraph(s) to Notion page {page_id}."
+
+
+def do_notion_create_page(token, action_data, files_out):
     parent = ({"page_id": action_data["parent_page_id"]} if action_data.get("parent_page_id")
               else {"workspace": True})
     children = [{"object": "block", "type": "paragraph",
@@ -1059,24 +1245,45 @@ def do_notion_create_page(token, action_data):
     return f"Created Notion page \"{action_data.get('title', 'Untitled')}\": {result.get('url', '')}"
 
 
-def figma_api(token, path):
-    resp = requests.get(f"https://api.figma.com/v1{path}",
-                         headers={"Authorization": f"Bearer {token}"}, timeout=30)
+def do_notion_archive_page(token, action_data, files_out):
+    page_id = action_data["page_id"]
+    notion_api(token, "PATCH", f"/pages/{page_id}", json={"archived": True})
+    return f"Archived (deleted) Notion page {page_id}."
+
+
+def figma_api(token, method, path, **kwargs):
+    resp = requests.request(method, f"https://api.figma.com/v1{path}",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30, **kwargs)
     if resp.status_code >= 400:
         raise RuntimeError(f"Figma API error ({resp.status_code}): {resp.text[:300]}")
     return resp.json()
 
 
-def do_figma_get_file(token, action_data):
-    data = figma_api(token, f"/files/{action_data['file_key']}")
+def do_figma_get_file(token, action_data, files_out):
+    data = figma_api(token, "GET", f"/files/{action_data['file_key']}")
     top_frames = [n.get("name") for n in (data.get("document", {}).get("children", []) or [])[:15]]
     return f"Figma file \"{data.get('name', '')}\" — top-level frames/pages: {', '.join(top_frames) or '(none found)'}"
+
+
+def do_figma_list_comments(token, action_data, files_out):
+    data = figma_api(token, "GET", f"/files/{action_data['file_key']}/comments")
+    lines = [f"- {(c.get('user') or {}).get('handle', 'someone')}: {c.get('message', '')[:200]}"
+             for c in data.get("comments", [])[:20]]
+    return "Figma comments:\n" + ("\n".join(lines) if lines else "(none)")
+
+
+def do_figma_add_comment(token, action_data, files_out):
+    body = {"message": action_data.get("message", "")}
+    if action_data.get("node_id"):
+        body["client_meta"] = {"node_id": action_data["node_id"], "node_offset": {"x": 0, "y": 0}}
+    figma_api(token, "POST", f"/files/{action_data['file_key']}/comments", json=body)
+    return f"Added a comment to Figma file {action_data['file_key']}."
 
 
 def do_figma_export_images(token, action_data, files_out):
     ids = ",".join(action_data.get("node_ids", []))
     fmt = action_data.get("format", "png")
-    data = figma_api(token, f"/images/{action_data['file_key']}?ids={ids}&format={fmt}")
+    data = figma_api(token, "GET", f"/images/{action_data['file_key']}?ids={ids}&format={fmt}")
     images = data.get("images", {}) or {}
     count = 0
     for node_id, url in images.items():
@@ -1092,31 +1299,62 @@ def do_figma_export_images(token, action_data, files_out):
     return f"Exported {count} image(s) from Figma."
 
 
-def ms_graph_api(token, path):
-    resp = requests.get(f"https://graph.microsoft.com/v1.0{path}",
-                         headers={"Authorization": f"Bearer {token}"}, timeout=30)
+def ms_graph_api(token, method, path, **kwargs):
+    resp = requests.request(method, f"https://graph.microsoft.com/v1.0{path}",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30, **kwargs)
     if resp.status_code >= 400:
         raise RuntimeError(f"Microsoft Graph error ({resp.status_code}): {resp.text[:300]}")
-    return resp.json()
+    return resp.json() if resp.text else {}
 
 
-def do_ms365_recent_files(token, action_data):
-    data = ms_graph_api(token, "/me/drive/recent")
+def do_ms365_recent_files(token, action_data, files_out):
+    data = ms_graph_api(token, "GET", "/me/drive/recent")
     names = [it.get("name") for it in data.get("value", [])[:15]]
     return "Recent OneDrive/SharePoint files: " + (", ".join(names) if names else "(none found)")
 
 
-def do_ms365_search_files(token, action_data):
+def do_ms365_search_files(token, action_data, files_out):
     from urllib.parse import quote
     q = quote(action_data.get("query", ""))
-    data = ms_graph_api(token, f"/me/drive/root/search(q='{q}')")
+    data = ms_graph_api(token, "GET", f"/me/drive/root/search(q='{q}')")
     names = [it.get("name") for it in data.get("value", [])[:15]]
     return f"Files matching \"{action_data.get('query', '')}\": " + (", ".join(names) if names else "(none found)")
 
 
-def do_ms365_teams_messages(token, action_data):
+def do_ms365_read_file(token, action_data, files_out):
+    item_id = action_data["item_id"]
+    meta = ms_graph_api(token, "GET", f"/me/drive/items/{item_id}")
+    resp = requests.get(f"https://graph.microsoft.com/v1.0/me/drive/items/{item_id}/content",
+                         headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Microsoft Graph error ({resp.status_code}): {resp.text[:300]}")
+    fname = meta.get("name", "file")
+    try:
+        text = resp.content.decode("utf-8")
+        files_out.append({"filename": safe_filename(fname, ""), "mimetype": "text/plain",
+                           "data_base64": base64.b64encode(resp.content).decode()})
+        preview = text if len(text) <= 4000 else text[:4000] + "\n...[truncated — full file attached below]"
+        return f"Read `{fname}` ({len(resp.content)} bytes):\n```\n{preview}\n```"
+    except UnicodeDecodeError:
+        files_out.append({"filename": safe_filename(fname, ""),
+                           "mimetype": meta.get("file", {}).get("mimeType", "application/octet-stream"),
+                           "data_base64": base64.b64encode(resp.content).decode()})
+        return f"`{fname}` isn't plain text ({len(resp.content)} bytes) — attached as a file instead."
+
+
+def do_ms365_list_teams_channels(token, action_data, files_out):
+    if action_data.get("team_id"):
+        data = ms_graph_api(token, "GET", f"/teams/{action_data['team_id']}/channels")
+        names = [f"{c.get('displayName')} (id: {c.get('id')})" for c in data.get("value", [])]
+        return f"Channels in team {action_data['team_id']}:\n" + ("\n".join(f"- {n}" for n in names) if names else "(none)")
+    data = ms_graph_api(token, "GET", "/me/joinedTeams")
+    names = [f"{t.get('displayName')} (id: {t.get('id')})" for t in data.get("value", [])]
+    return "Teams I'm a member of:\n" + ("\n".join(f"- {n}" for n in names) if names else "(none found)")
+
+
+def do_ms365_teams_messages(token, action_data, files_out):
     team_id, channel_id = action_data.get("team_id"), action_data.get("channel_id")
-    data = ms_graph_api(token, f"/teams/{team_id}/channels/{channel_id}/messages")
+    data = ms_graph_api(token, "GET", f"/teams/{team_id}/channels/{channel_id}/messages")
     msgs = data.get("value", [])[:10]
     lines = []
     for m in msgs:
@@ -1124,6 +1362,56 @@ def do_ms365_teams_messages(token, action_data):
         author = ((m.get("from", {}) or {}).get("user", {}) or {}).get("displayName", "someone")
         lines.append(f"- {author}: {re.sub('<[^<]+?>', '', body)[:200]}")
     return "Recent Teams messages:\n" + ("\n".join(lines) if lines else "(none found)")
+
+
+def do_ms365_send_teams_message(token, action_data, files_out):
+    team_id, channel_id = action_data["team_id"], action_data["channel_id"]
+    body = {"body": {"content": action_data.get("text", "")}}
+    ms_graph_api(token, "POST", f"/teams/{team_id}/channels/{channel_id}/messages", json=body)
+    return f"Posted a message to the Teams channel."
+
+
+# Registry: action name -> (which CONNECTORS key it needs, handler(token, action_data, files_out) -> str)
+CONNECTOR_ACTIONS = {
+    "github_list_repos": ("github", do_github_list_repos),
+    "github_list_files": ("github", do_github_list_files),
+    "github_read_file": ("github", do_github_read_file),
+    "github_commit_file": ("github", do_github_commit_file),
+    "github_delete_file": ("github", do_github_delete_file),
+    "github_create_branch": ("github", do_github_create_branch),
+    "github_list_pull_requests": ("github", do_github_list_pull_requests),
+    "github_create_pull_request": ("github", do_github_create_pull_request),
+    "github_merge_pull_request": ("github", do_github_merge_pull_request),
+    "github_close_pull_request": ("github", do_github_close_pull_request),
+    "github_list_issues": ("github", do_github_list_issues),
+    "github_create_issue": ("github", do_github_create_issue),
+    "github_comment_on_issue": ("github", do_github_comment_on_issue),
+    "github_close_issue": ("github", do_github_close_issue),
+
+    "slack_list_channels": ("slack", do_slack_list_channels),
+    "slack_read_channel_messages": ("slack", do_slack_read_channel_messages),
+    "slack_send_message": ("slack", do_slack_send_message),
+    "slack_reply_thread": ("slack", do_slack_reply_thread),
+    "slack_add_reaction": ("slack", do_slack_add_reaction),
+
+    "notion_search": ("notion", do_notion_search),
+    "notion_read_page": ("notion", do_notion_read_page),
+    "notion_create_page": ("notion", do_notion_create_page),
+    "notion_update_page": ("notion", do_notion_update_page),
+    "notion_archive_page": ("notion", do_notion_archive_page),
+
+    "figma_get_file": ("figma", do_figma_get_file),
+    "figma_list_comments": ("figma", do_figma_list_comments),
+    "figma_add_comment": ("figma", do_figma_add_comment),
+    "figma_export_images": ("figma", do_figma_export_images),
+
+    "ms365_recent_files": ("microsoft365", do_ms365_recent_files),
+    "ms365_search_files": ("microsoft365", do_ms365_search_files),
+    "ms365_read_file": ("microsoft365", do_ms365_read_file),
+    "ms365_list_teams_channels": ("microsoft365", do_ms365_list_teams_channels),
+    "ms365_teams_messages": ("microsoft365", do_ms365_teams_messages),
+    "ms365_send_teams_message": ("microsoft365", do_ms365_send_teams_message),
+}
 
 
 # =============================================================================
@@ -1200,36 +1488,13 @@ def execute_actions(actions, memory, connections=None):
                 if tool in CONNECTORS:
                     connector_suggestions.append({"tool": tool, "reason": action_data.get("reason", "")})
 
-            elif action_type in (
-                "github_list_repos", "github_commit_file",
-                "slack_list_channels", "slack_send_message",
-                "notion_search", "notion_create_page",
-                "figma_get_file", "figma_export_images",
-                "ms365_recent_files", "ms365_search_files", "ms365_teams_messages",
-            ):
-                tool = {
-                    "github_list_repos": "github", "github_commit_file": "github",
-                    "slack_list_channels": "slack", "slack_send_message": "slack",
-                    "notion_search": "notion", "notion_create_page": "notion",
-                    "figma_get_file": "figma", "figma_export_images": "figma",
-                    "ms365_recent_files": "microsoft365", "ms365_search_files": "microsoft365",
-                    "ms365_teams_messages": "microsoft365",
-                }[action_type]
+            elif action_type in CONNECTOR_ACTIONS:
+                tool, handler_fn = CONNECTOR_ACTIONS[action_type]
                 token = _connector_token(connections, tool)
-                handler_fn = {
-                    "github_list_repos": lambda: do_github_list_repos(token, action_data),
-                    "github_commit_file": lambda: do_github_commit_file(token, action_data),
-                    "slack_list_channels": lambda: do_slack_list_channels(token, action_data),
-                    "slack_send_message": lambda: do_slack_send_message(token, action_data),
-                    "notion_search": lambda: do_notion_search(token, action_data),
-                    "notion_create_page": lambda: do_notion_create_page(token, action_data),
-                    "figma_get_file": lambda: do_figma_get_file(token, action_data),
-                    "figma_export_images": lambda: do_figma_export_images(token, action_data, files),
-                    "ms365_recent_files": lambda: do_ms365_recent_files(token, action_data),
-                    "ms365_search_files": lambda: do_ms365_search_files(token, action_data),
-                    "ms365_teams_messages": lambda: do_ms365_teams_messages(token, action_data),
-                }[action_type]
-                system_notes.append(f"🔗 {handler_fn()}")
+                system_notes.append(f"🔗 {handler_fn(token, action_data, files)}")
+
+            else:
+                system_notes.append(f"⚠️ Unknown action `{action_type}` — ignored.")
 
         except Exception as e:
             system_notes.append(f"❌ Failed to complete `{action_type}`: {e}")
